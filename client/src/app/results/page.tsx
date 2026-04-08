@@ -9,46 +9,6 @@ import { StatusBadge } from "@/components/ui/StatusBadge";
 import { getResults, approveEmail } from "@/lib/api";
 import type { Candidate, CandidateStatus } from "@/lib/types";
 
-// ── mock data for dev (no backend yet) ──────────────────────────────────────
-const MOCK_CANDIDATES: Candidate[] = [
-  {
-    id: "c1", rank: 1, name: "Alice Chen", email: "alice@example.com",
-    resumeUrl: "#", status: "shortlist",
-    scoreBreakdown: { skills: 92, experience: 88, education: 85, keywords: 90, overall: 90 },
-    explanation:
-      "Alice closely matches all required skills including Python, TensorFlow, and MLOps. She has 5 years of relevant ML engineering experience which exceeds the 3-year requirement, and holds an MS in Computer Science from a top institution.",
-    matchedSkills: ["Python", "TensorFlow", "MLOps", "Docker", "Kubernetes", "GCP"],
-    missingSkills: ["Spark"],
-  },
-  {
-    id: "c2", rank: 2, name: "Ben Okafor", email: "ben@example.com",
-    resumeUrl: "#", status: "shortlist",
-    scoreBreakdown: { skills: 80, experience: 75, education: 78, keywords: 82, overall: 79 },
-    explanation:
-      "Ben demonstrates strong Python and deep learning skills. His 3 years of experience meets the minimum requirement. Minor gaps in cloud infrastructure tools are noted.",
-    matchedSkills: ["Python", "PyTorch", "REST APIs", "SQL"],
-    missingSkills: ["Kubernetes", "MLOps", "Spark"],
-  },
-  {
-    id: "c3", rank: 3, name: "Priya Nair", email: "priya@example.com",
-    resumeUrl: "#", status: "manual_review",
-    scoreBreakdown: { skills: 65, experience: 60, education: 90, keywords: 70, overall: 67 },
-    explanation:
-      "Priya has an exceptional academic background with a PhD in Statistics, but her industry experience is limited to 1 year — below the 3-year minimum. Her strong fundamentals suggest high potential; recommend manual review.",
-    matchedSkills: ["Python", "R", "Statistics", "Machine Learning"],
-    missingSkills: ["MLOps", "Kubernetes", "Docker", "GCP", "Production deployment"],
-  },
-  {
-    id: "c4", rank: 4, name: "Carlos Ruiz", email: "carlos@example.com",
-    resumeUrl: "#", status: "reject",
-    scoreBreakdown: { skills: 35, experience: 40, education: 50, keywords: 30, overall: 38 },
-    explanation:
-      "Carlos's background is primarily in frontend development with minimal ML experience. The required skills such as TensorFlow, model training, and cloud ML platforms are absent from the resume.",
-    matchedSkills: ["JavaScript", "React"],
-    missingSkills: ["Python", "TensorFlow", "MLOps", "Cloud platforms", "Model training"],
-  },
-];
-
 const STATUS_FILTERS: { label: string; value: CandidateStatus | "all" }[] = [
   { label: "All",           value: "all" },
   { label: "Shortlisted",   value: "shortlist" },
@@ -69,17 +29,17 @@ function ResultsContent() {
     setLoading(true);
     setError(null);
     try {
-      if (jobId) {
-        const data = await getResults(jobId);
-        setCandidates(data);
-      } else {
-        // Dev mode: use mock data when no jobId
-        await delay(800);
-        setCandidates(MOCK_CANDIDATES);
+      if (!jobId) {
+        setCandidates([]);
+        setError("Missing job ID. Upload a job description first to view real rankings.");
+        return;
       }
-    } catch {
-      // Fall back to mock data if backend unreachable
-      setCandidates(MOCK_CANDIDATES);
+
+      const data = await getResults(jobId);
+      setCandidates(data);
+    } catch (err) {
+      setCandidates([]);
+      setError(err instanceof Error ? err.message : "Could not fetch real ranking results.");
     } finally {
       setLoading(false);
     }
@@ -202,8 +162,4 @@ function LoadingSkeleton() {
       ))}
     </div>
   );
-}
-
-function delay(ms: number) {
-  return new Promise((r) => setTimeout(r, ms));
 }
