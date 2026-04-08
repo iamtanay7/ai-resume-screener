@@ -11,6 +11,7 @@ _client: firestore.Client | None = None
 
 COLLECTION_CANDIDATES = "candidates"
 COLLECTION_JOBS = "jobs"
+SUBCOLLECTION_NLP = "nlpArtifacts"
 
 
 def _get_client() -> firestore.Client:
@@ -82,5 +83,51 @@ def approve_email(candidate_id: str) -> None:
         {
             "emailApproved": True,
             "emailApprovedAt": datetime.now(timezone.utc).isoformat(),
+        }
+    )
+
+
+def mark_candidate_processing(candidate_id: str, status: str, error: str | None = None) -> None:
+    """Update Tanay's NLP processing status for a candidate."""
+    db = _get_client()
+    payload: dict[str, Any] = {
+        "status": status,
+        "updatedAt": datetime.now(timezone.utc).isoformat(),
+    }
+    if error:
+        payload["processingError"] = error
+    db.collection(COLLECTION_CANDIDATES).document(candidate_id).update(payload)
+
+
+def mark_job_processing(job_id: str, status: str, error: str | None = None) -> None:
+    """Update Tanay's NLP processing status for a job description."""
+    db = _get_client()
+    payload: dict[str, Any] = {
+        "status": status,
+        "updatedAt": datetime.now(timezone.utc).isoformat(),
+    }
+    if error:
+        payload["processingError"] = error
+    db.collection(COLLECTION_JOBS).document(job_id).update(payload)
+
+
+def save_nlp_artifact(
+    parent_collection: str,
+    document_id: str,
+    artifact_id: str,
+    payload: dict[str, Any],
+) -> None:
+    """Persist parsed text, section data, and embeddings under a document subcollection."""
+    db = _get_client()
+    doc_ref = (
+        db.collection(parent_collection)
+        .document(document_id)
+        .collection(SUBCOLLECTION_NLP)
+        .document(artifact_id)
+    )
+    doc_ref.set(
+        {
+            **payload,
+            "savedAt": datetime.now(timezone.utc).isoformat(),
         }
     )

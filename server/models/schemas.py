@@ -1,7 +1,7 @@
 from datetime import datetime
 from typing import Literal
 
-from pydantic import BaseModel, EmailStr
+from pydantic import BaseModel, EmailStr, Field
 
 
 # ── Upload responses ──────────────────────────────────────────────────────────
@@ -33,6 +33,32 @@ class JobRecord(BaseModel):
     fileUrl: str            # gs:// path
     uploadedAt: datetime
     status: str = "uploaded"
+
+
+# ── NLP processing (Tanay) ────────────────────────────────────────────────────
+
+DocumentKind = Literal["resume", "job_description"]
+PipelineStage = Literal["uploaded", "parsing", "parsed", "embedding", "processed", "failed"]
+
+
+class DocumentSection(BaseModel):
+    title: str
+    content: str
+
+
+class ParsedDocument(BaseModel):
+    documentId: str
+    kind: DocumentKind
+    sourceUrl: str
+    extractedText: str
+    sections: list[DocumentSection]
+    metadata: dict[str, str] = Field(default_factory=dict)
+
+
+class EmbeddingRecord(BaseModel):
+    model: str
+    vector: list[float]
+    textSnippet: str
 
 
 # ── Results (written by Michael's ranking engine, read here) ──────────────────
