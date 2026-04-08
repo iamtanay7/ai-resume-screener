@@ -1,6 +1,13 @@
 export type CandidateStatus = "shortlist" | "manual_review" | "reject";
 
 export type PipelineStageStatus = "pending" | "processing" | "done" | "error";
+export type BackendProcessingStatus =
+  | "uploaded"
+  | "parsing"
+  | "parsed"
+  | "embedding"
+  | "processed"
+  | "failed";
 
 export interface ScoreBreakdown {
   skills: number;      // 0–100, weight 40%
@@ -43,6 +50,12 @@ export interface UploadResumeResponse {
 export interface UploadJDResponse {
   jobId: string;
   message: string;
+}
+
+export interface ProcessingStatusResponse {
+  documentId: string;
+  status: BackendProcessingStatus;
+  processingError: string | null;
 }
 
 export interface ApiError {

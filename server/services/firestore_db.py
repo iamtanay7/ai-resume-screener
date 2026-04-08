@@ -75,6 +75,13 @@ def get_candidate(candidate_id: str) -> dict[str, Any] | None:
     return doc.to_dict() if doc.exists else None
 
 
+def get_job(job_id: str) -> dict[str, Any] | None:
+    """Fetch a single job document."""
+    db = _get_client()
+    doc = db.collection(COLLECTION_JOBS).document(job_id).get()
+    return doc.to_dict() if doc.exists else None
+
+
 def approve_email(candidate_id: str) -> None:
     """Mark a candidate's notification email as approved by the recruiter."""
     db = _get_client()
