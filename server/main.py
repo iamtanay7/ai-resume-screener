@@ -9,7 +9,7 @@ from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 
 from config import settings
-from routers import notify, results, upload
+from routers import ingest, notify, results, upload
 
 logging.basicConfig(
     level=logging.INFO,
@@ -35,6 +35,7 @@ app.add_middleware(
 )
 
 app.include_router(upload.router)
+app.include_router(ingest.router)
 app.include_router(results.router)
 app.include_router(notify.router)
 

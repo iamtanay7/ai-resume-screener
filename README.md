@@ -142,6 +142,12 @@ PYTHONPATH=. ./venv/bin/python scripts/upload_and_test_nlp.py \
   --file /absolute/path/to/resume.pdf
 ```
 
+Automatic ingestion handoff:
+
+- Upload routes publish `resume_uploaded` and `jd_uploaded` events to Pub/Sub.
+- `POST /events/pubsub` accepts Pub/Sub push payloads and calls `process_upload_event()`.
+- This endpoint is the handoff between Asmita's ingestion/storage layer and Tanay's NLP processing layer.
+
 ## Getting Started
 
 ### Client

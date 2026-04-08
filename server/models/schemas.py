@@ -61,6 +61,34 @@ class EmbeddingRecord(BaseModel):
     textSnippet: str
 
 
+# ── Pub/Sub ingestion ─────────────────────────────────────────────────────────
+
+class PubSubMessage(BaseModel):
+    data: str
+    messageId: str | None = None
+    publishTime: str | None = None
+    attributes: dict[str, str] = Field(default_factory=dict)
+
+
+class PubSubPushEnvelope(BaseModel):
+    message: PubSubMessage
+    subscription: str | None = None
+
+
+class IngestionResponse(BaseModel):
+    message: str
+    documentId: str
+    eventType: str
+
+
+# ── Processing status ─────────────────────────────────────────────────────────
+
+class ProcessingStatusResponse(BaseModel):
+    documentId: str
+    status: PipelineStage
+    processingError: str | None = None
+
+
 # ── Results (written by Michael's ranking engine, read here) ──────────────────
 
 CandidateStatus = Literal["shortlist", "manual_review", "reject"]
