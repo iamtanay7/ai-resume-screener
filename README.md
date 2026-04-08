@@ -100,6 +100,48 @@ This repository is currently in initial bootstrap stage and starts with project-
 
 Upload → Parse → Embed → Match → Rank → Explain
 
+## Tanay's Starting Point
+
+Tanay owns the `Parse → Embed` stage.
+
+Current repo support for that work now lives in:
+
+- `server/services/nlp_pipeline.py` for the orchestration contract
+- `server/services/firestore_db.py` for status and artifact persistence
+- `server/models/schemas.py` for parsed document and embedding shapes
+- `server/config.py` for Document AI and Vertex AI settings
+
+Suggested build order:
+
+1. Replace `parse_document()` with a real Document AI call that reads from `gcsPath`.
+2. Normalize sections into skills, experience, education, projects, and certifications.
+3. Replace `build_embedding()` with Vertex AI embeddings on full text plus chunks.
+4. Save chunk-level vectors if Michael needs section-level matching and ranking.
+5. Wire this module to a Pub/Sub subscriber or Cloud Run worker that consumes:
+   - resume events: `{"type":"resume_uploaded","candidateId":"...","gcsPath":"...","email":"..."}`
+   - JD events: `{"type":"jd_uploaded","jobId":"...","gcsPath":"...","title":"..."}`
+
+Quick test command:
+
+```bash
+cd server
+PYTHONPATH=. ./venv/bin/python scripts/test_nlp_pipeline.py \
+  --kind resume_uploaded \
+  --document-id test-candidate-1 \
+  --gcs-path gs://resume-screener-raw-bda-project-491821/resumes/<file>.pdf
+```
+
+Use `--persist` if you want the script to run the full pipeline and save parsed artifacts plus embeddings to Firestore.
+
+One-command local upload + test:
+
+```bash
+cd server
+PYTHONPATH=. ./venv/bin/python scripts/upload_and_test_nlp.py \
+  --kind resume_uploaded \
+  --file /absolute/path/to/resume.pdf
+```
+
 ## Getting Started
 
 ### Client
