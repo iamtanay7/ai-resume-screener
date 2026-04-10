@@ -19,6 +19,8 @@ def test_trigger_ranking_returns_accepted(monkeypatch):
     assert response.status_code == 202
     body = response.json()
     assert body["jobId"] == "job-xyz"
+    assert captured["job_id"] == "job-xyz"
+    assert captured["candidate_ids"] == ["c1", "c2"]
 
 
 def test_trigger_ranking_accepts_when_engine_defers(monkeypatch):

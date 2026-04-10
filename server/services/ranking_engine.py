@@ -104,8 +104,8 @@ def _hard_filter_outcome(job_data: dict[str, Any], candidate_data: dict[str, Any
         location_ok = str(candidate_filters.get("location", "")).strip().lower() == str(location_required).strip().lower()
 
     work_auth_ok = True
-    if work_auth_required is not None:
-        work_auth_ok = bool(candidate_filters.get("workAuth")) == bool(work_auth_required)
+    if work_auth_required:
+        work_auth_ok = bool(candidate_filters.get("workAuth"))
 
     years_experience = _to_float(candidate_data.get("yearsExperience"))
     min_years_ok = years_experience >= min_years

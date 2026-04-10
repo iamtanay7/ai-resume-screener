@@ -57,6 +57,11 @@ def _select_nlp_artifact(payload: dict[str, Any], subcollection_artifacts: dict[
     )
 
     status_doc = subcollection_artifacts.get("status") or {}
+    
+    # Normalize inline status: extract .get("value") if status is a dict, else use as-is
+    inline_status = nlp.get("status")
+    if isinstance(inline_status, dict):
+        inline_status = inline_status.get("value")
 
     return {
         "skills": parsed.get("skills", []),
@@ -66,7 +71,7 @@ def _select_nlp_artifact(payload: dict[str, Any], subcollection_artifacts: dict[
         "keywords": parsed.get("keywords", []),
         "hardFilters": parsed.get("hardFilters", {}),
         "embedding": embedding_doc.get("vector") or parsed.get("embedding") or [],
-        "processingStatus": status_doc.get("value") or nlp.get("status") or payload.get("status") or "",
+        "processingStatus": status_doc.get("value") or inline_status or payload.get("status") or "",
     }
 
 

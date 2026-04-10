@@ -96,6 +96,74 @@ def test_run_ranking_hard_filter_forces_reject(monkeypatch):
     assert writes[0]["hard_filters"]["locationPassed"] is False
 
 
+def test_run_ranking_workauth_false_means_not_required(monkeypatch):
+    """Test that workAuth: False in job hard filters means 'not required', not 'rejected'."""
+    writes: list[dict[str, Any]] = []
+
+    # Job with workAuth: False means candidate with workAuth: True should NOT be rejected
+    job = {
+        "skills": ["Python"],
+        "requiredYearsExperience": 1,
+        "educationLevel": "bachelors",
+        "keywords": ["ml"],
+        "hardFilters": {"location": "US", "workAuth": False, "minYearsExperience": 2},
+        "processingStatus": "processed",
+    }
+    candidates = [
+        {
+            "id": "accept-workauth-false",
+            "skills": ["Python"],
+            "yearsExperience": 10,
+            "educationLevel": "bachelors",
+            "keywords": ["ml"],
+            "hardFilters": {"location": "US", "workAuth": True},  # Candidate has workAuth=True
+            "processingStatus": "processed",
+        }
+    ]
+
+    _stub_firestore(monkeypatch, job=job, candidates=candidates, writes=writes)
+    ranking_engine.run_ranking("job-workauth-false")
+
+    # Should pass hard filters and be ranked (not rejected)
+    assert writes[0]["status"] != "reject"
+    assert writes[0]["hard_filters"]["passed"] is True
+    assert writes[0]["hard_filters"]["workAuthPassed"] is True
+
+
+def test_run_ranking_workauth_true_still_enforces_requirement(monkeypatch):
+    """Test that workAuth: True in job hard filters still enforces requirement."""
+    writes: list[dict[str, Any]] = []
+
+    # Job with workAuth: True means candidate with workAuth: False should be rejected
+    job = {
+        "skills": ["Python"],
+        "requiredYearsExperience": 1,
+        "educationLevel": "bachelors",
+        "keywords": ["ml"],
+        "hardFilters": {"location": "US", "workAuth": True, "minYearsExperience": 2},
+        "processingStatus": "processed",
+    }
+    candidates = [
+        {
+            "id": "reject-workauth-true",
+            "skills": ["Python"],
+            "yearsExperience": 10,
+            "educationLevel": "bachelors",
+            "keywords": ["ml"],
+            "hardFilters": {"location": "US", "workAuth": False},  # Candidate has workAuth=False
+            "processingStatus": "processed",
+        }
+    ]
+
+    _stub_firestore(monkeypatch, job=job, candidates=candidates, writes=writes)
+    ranking_engine.run_ranking("job-workauth-true")
+
+    # Should be rejected due to workAuth requirement
+    assert writes[0]["status"] == "reject"
+    assert writes[0]["hard_filters"]["passed"] is False
+    assert writes[0]["hard_filters"]["workAuthPassed"] is False
+
+
 # ── Status thresholds ────────────────────────────────────────────────────────
 
 

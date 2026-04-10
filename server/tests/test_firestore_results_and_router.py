@@ -129,6 +129,28 @@ def test_firestore_helpers_prefer_singular_embedding_over_plural(fake_firestore)
 # ── Results router tests ─────────────────────────────────────────────────────
 
 
+def test_firestore_helpers_normalize_processing_status_dict_and_keep_it_blocked(fake_firestore):
+    """Test that inline status dicts normalize and still represent an unprocessed artifact."""
+    fake_firestore["candidates"]["c3"] = {
+        "id": "c3",
+        "nlpArtifacts": {
+            "status": {"value": "processing"},
+            "parsed": {
+                "skills": ["Java"],
+                "yearsExperience": 3,
+                "educationLevel": "bachelors",
+                "keywords": ["backend"],
+                "hardFilters": {},
+            },
+            "embedding": {"vector": [5.5]},
+        },
+    }
+
+    candidates = firestore_db.get_candidate_processed_artifacts(["c3"])
+
+    assert candidates[0]["processingStatus"] == "processing"
+
+
 def test_get_results_endpoint_allows_missing_explanation(monkeypatch):
     def fake_get_results_for_job(job_id: str):
         return [
