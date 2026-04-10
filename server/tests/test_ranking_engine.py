@@ -276,7 +276,7 @@ def test_run_ranking_skips_incomplete_candidate_artifacts(monkeypatch):
         "server.services.firestore_db.get_candidate_processed_artifacts",
         lambda candidate_ids=None: [
             {"id": "not-ready", "skills": ["python"], "processingStatus": "processing"},
-            {"id": "no-skills", "skills": [], "processingStatus": "processed"},
+            {"id": "no-artifacts", "skills": [], "embedding": [], "keywords": [], "processingStatus": ""},
             {"id": "good", "skills": ["python"], "yearsExperience": 1, "educationLevel": "", "keywords": [], "hardFilters": {}, "processingStatus": "processed"},
         ],
     )
@@ -286,6 +286,40 @@ def test_run_ranking_skips_incomplete_candidate_artifacts(monkeypatch):
 
     assert count == 1
     assert writes[0]["candidate_id"] == "good"
+
+
+def test_run_ranking_persists_processed_candidate_even_without_skills(monkeypatch):
+    writes: list[dict[str, Any]] = []
+    job = {
+        "skills": ["python"],
+        "requiredYearsExperience": 4,
+        "educationLevel": "bachelors",
+        "keywords": ["etl"],
+        "embedding": [1.0, 0.0, 0.0],
+        "hardFilters": {},
+        "processingStatus": "processed",
+    }
+    candidates = [
+        {
+            "id": "embedding-only",
+            "skills": [],
+            "yearsExperience": 1,
+            "educationLevel": "",
+            "keywords": [],
+            "hardFilters": {},
+            "embedding": [1.0, 0.0, 0.0],
+            "processingStatus": "processed",
+        }
+    ]
+
+    _stub_firestore(monkeypatch, job=job, candidates=candidates, writes=writes)
+
+    count = ranking_engine.run_ranking("job-no-skills")
+
+    assert count == 1
+    assert writes[0]["candidate_id"] == "embedding-only"
+    assert writes[0]["status"] == "reject"
+    assert writes[0]["score_breakdown"]["skills"] == 30.0
 
 
 # ── Semantic scoring ─────────────────────────────────────────────────────────

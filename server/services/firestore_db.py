@@ -147,7 +147,7 @@ def get_candidate_processed_artifacts(candidate_ids: list[str] | None = None) ->
     db = _get_client()
     refs = db.collection(COLLECTION_CANDIDATES)
 
-    if candidate_ids:
+    if candidate_ids is not None:
         docs = [refs.document(candidate_id).get() for candidate_id in candidate_ids]
     else:
         docs = list(refs.stream())

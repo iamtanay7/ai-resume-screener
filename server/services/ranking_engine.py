@@ -205,8 +205,6 @@ def run_ranking(job_id: str, candidate_ids: list[str] | None = None) -> int:
         candidate_has_artifact_content = bool(candidate.get("skills") or candidate.get("embedding") or candidate.get("keywords"))
         if not candidate_id or not _is_processed(candidate.get("processingStatus"), candidate_has_artifact_content):
             continue
-        if not candidate.get("skills"):
-            continue
         scored.append(_score_candidate(job_data=job_data, candidate_data=candidate, candidate_id=candidate_id))
 
     scored.sort(

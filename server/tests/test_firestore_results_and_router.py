@@ -126,6 +126,20 @@ def test_firestore_helpers_prefer_singular_embedding_over_plural(fake_firestore)
     assert candidates[0]["embedding"] == [4.4]
 
 
+def test_firestore_helpers_empty_candidate_ids_returns_no_candidates(fake_firestore):
+    fake_firestore["candidates"]["c1"] = {
+        "id": "c1",
+        "nlpArtifacts": {
+            "status": "processed",
+            "parsed": {"skills": ["Python"]},
+        },
+    }
+
+    candidates = firestore_db.get_candidate_processed_artifacts([])
+
+    assert candidates == []
+
+
 # ── Results router tests ─────────────────────────────────────────────────────
 
 
