@@ -55,10 +55,22 @@ class RankedCandidate(BaseModel):
     resumeUrl: str
     scoreBreakdown: ScoreBreakdown
     status: CandidateStatus
-    explanation: str
+    explanation: str | None = None
     missingSkills: list[str]
     matchedSkills: list[str]
     rank: int
+
+
+class RankingTriggerRequest(BaseModel):
+    """Trigger payload emitted after Tanay's processing stage completes."""
+
+    jobId: str
+    candidateIds: list[str] | None = None
+
+
+class RankingTriggerResponse(BaseModel):
+    message: str
+    jobId: str
 
 
 # ── Notify ────────────────────────────────────────────────────────────────────

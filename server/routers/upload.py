@@ -11,9 +11,9 @@ from pathlib import Path
 
 from fastapi import APIRouter, Form, HTTPException, UploadFile, status
 
-from config import settings
-from models.schemas import UploadJDResponse, UploadResumeResponse
-from services import firestore_db, pubsub, storage
+from server.config import settings
+from server.models.schemas import UploadJDResponse, UploadResumeResponse
+from server.services import firestore_db, pubsub, storage
 
 logger = logging.getLogger(__name__)
 router = APIRouter(prefix="/upload", tags=["upload"])

@@ -2,7 +2,7 @@
 
 from google.cloud import storage
 
-from config import settings
+from server.config import settings
 
 _client: storage.Client | None = None
 

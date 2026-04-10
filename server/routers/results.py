@@ -8,8 +8,8 @@ import logging
 
 from fastapi import APIRouter, HTTPException, status
 
-from models.schemas import RankedCandidate
-from services import firestore_db
+from server.models.schemas import RankedCandidate
+from server.services import firestore_db
 
 logger = logging.getLogger(__name__)
 router = APIRouter(prefix="/results", tags=["results"])
