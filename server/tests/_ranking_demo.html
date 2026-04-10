@@ -1,0 +1,597 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="utf-8">
+    <title>Ranking Engine — Visual Demo</title>
+    <style>
+        * { margin:0; padding:0; box-sizing:border-box; }
+        body { font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,sans-serif;
+               background:#f1f5f9; color:#1e293b; padding:32px; }
+    </style>
+</head>
+<body>
+    <div style="max-width:800px;margin:0 auto;">
+        <!-- Title -->
+        <div style="text-align:center;margin-bottom:32px;">
+            <h1 style="font-size:24px;font-weight:800;
+                        background:linear-gradient(135deg,#6366f1,#8b5cf6);
+                        -webkit-background-clip:text;-webkit-text-fill-color:transparent;">
+                Ranking Engine — Visual Demo
+            </h1>
+            <p style="color:#64748b;font-size:14px;margin-top:4px;">
+                Sample job + 5 candidates → weighted scoring → ranked output
+            </p>
+        </div>
+
+        <!-- Pipeline diagram -->
+        <div style="background:white;border-radius:16px;padding:20px;margin-bottom:24px;
+                    box-shadow:0 1px 3px rgba(0,0,0,.08);text-align:center;">
+            <div style="display:flex;align-items:center;justify-content:center;gap:8px;flex-wrap:wrap;font-size:13px;">
+                <span style="padding:6px 14px;background:#dbeafe;color:#1e40af;border-radius:8px;font-weight:600;">
+                    Tanay's NLP Artifacts</span>
+                <span style="color:#94a3b8;">→</span>
+                <span style="padding:6px 14px;background:#ede9fe;color:#6d28d9;border-radius:8px;font-weight:600;">
+                    Load Job + Candidates</span>
+                <span style="color:#94a3b8;">→</span>
+                <span style="padding:6px 14px;background:#fef3c7;color:#92400e;border-radius:8px;font-weight:600;">
+                    Hard Filters</span>
+                <span style="color:#94a3b8;">→</span>
+                <span style="padding:6px 14px;background:#d1fae5;color:#065f46;border-radius:8px;font-weight:600;">
+                    Weighted Scoring</span>
+                <span style="color:#94a3b8;">→</span>
+                <span style="padding:6px 14px;background:#fce7f3;color:#9d174d;border-radius:8px;font-weight:600;">
+                    Rank + Decide</span>
+                <span style="color:#94a3b8;">→</span>
+                <span style="padding:6px 14px;background:#e0e7ff;color:#3730a3;border-radius:8px;font-weight:600;">
+                    Persist to Firestore</span>
+            </div>
+        </div>
+
+        <!-- Job card -->
+        <div style="background:linear-gradient(135deg,#312e81,#4338ca);border-radius:16px;padding:24px;
+                    color:white;margin-bottom:24px;box-shadow:0 4px 12px rgba(67,56,202,.3);">
+            <div style="font-size:11px;font-weight:600;text-transform:uppercase;letter-spacing:.1em;
+                        opacity:.7;margin-bottom:4px;">Job Description</div>
+            <div style="font-size:20px;font-weight:700;margin-bottom:16px;">Senior ML Engineer — Search &amp; Retrieval</div>
+            <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px;font-size:13px;">
+                <div>
+                    <div style="opacity:.7;font-size:11px;margin-bottom:4px;">Required Skills</div>
+                    <span style="display:inline-block;padding:2px 8px;border-radius:12px;font-size:11px;font-weight:500;background:#dbeafe;color:#1e40af;border:1px solid #93c5fd;margin:2px;">Python</span> <span style="display:inline-block;padding:2px 8px;border-radius:12px;font-size:11px;font-weight:500;background:#dbeafe;color:#1e40af;border:1px solid #93c5fd;margin:2px;">PyTorch</span> <span style="display:inline-block;padding:2px 8px;border-radius:12px;font-size:11px;font-weight:500;background:#dbeafe;color:#1e40af;border:1px solid #93c5fd;margin:2px;">Kubernetes</span> <span style="display:inline-block;padding:2px 8px;border-radius:12px;font-size:11px;font-weight:500;background:#dbeafe;color:#1e40af;border:1px solid #93c5fd;margin:2px;">SQL</span> <span style="display:inline-block;padding:2px 8px;border-radius:12px;font-size:11px;font-weight:500;background:#dbeafe;color:#1e40af;border:1px solid #93c5fd;margin:2px;">GCP</span>
+                </div>
+                <div>
+                    <div style="opacity:.7;font-size:11px;margin-bottom:4px;">Keywords</div>
+                    <span style="display:inline-block;padding:2px 8px;border-radius:12px;font-size:11px;font-weight:500;background:#ede9fe;color:#6d28d9;border:1px solid #c4b5fd;margin:2px;">embeddings</span> <span style="display:inline-block;padding:2px 8px;border-radius:12px;font-size:11px;font-weight:500;background:#ede9fe;color:#6d28d9;border:1px solid #c4b5fd;margin:2px;">vector search</span> <span style="display:inline-block;padding:2px 8px;border-radius:12px;font-size:11px;font-weight:500;background:#ede9fe;color:#6d28d9;border:1px solid #c4b5fd;margin:2px;">MLOps</span> <span style="display:inline-block;padding:2px 8px;border-radius:12px;font-size:11px;font-weight:500;background:#ede9fe;color:#6d28d9;border:1px solid #c4b5fd;margin:2px;">CI/CD</span>
+                </div>
+                <div>
+                    <div style="opacity:.7;font-size:11px;margin-bottom:4px;">Experience</div>
+                    <b>5+ years</b> · Education: <b>masters</b>
+                </div>
+                <div>
+                    <div style="opacity:.7;font-size:11px;margin-bottom:4px;">Hard Filters</div>
+                    Location: <b>US</b> · Work Auth: <b>Required</b> · Min Experience: <b>3 yrs</b>
+                </div>
+            </div>
+        </div>
+
+        <!-- Weight legend -->
+        <div style="display:flex;gap:16px;justify-content:center;margin-bottom:20px;font-size:12px;color:#64748b;">
+            <span>Weights: </span>
+            <span>Skills <b>40%</b></span>
+            <span>Experience <b>30%</b></span>
+            <span>Education <b>15%</b></span>
+            <span>Keywords <b>15%</b></span>
+        </div>
+
+        <!-- Candidate cards -->
+        <div style="display:flex;flex-direction:column;gap:16px;">
+            
+        <div style="background:white;border-radius:16px;padding:24px;box-shadow:0 1px 3px rgba(0,0,0,.08);
+                    border-left:4px solid #059669;">
+            <!-- Header -->
+            <div style="display:flex;justify-content:space-between;align-items:flex-start;margin-bottom:16px;">
+                <div style="display:flex;align-items:center;gap:12px;">
+                    <div style="width:40px;height:40px;border-radius:50%;background:linear-gradient(135deg,#6366f1,#8b5cf6);
+                                display:flex;align-items:center;justify-content:center;color:white;font-weight:700;font-size:16px;">
+                        #1
+                    </div>
+                    <div>
+                        <div style="font-weight:700;font-size:16px;color:#1e293b;">Alice Chen</div>
+                        <div style="font-size:12px;color:#64748b;margin-top:2px;">7 yrs ML infra at Google. Masters in CS. Perfect skill match.</div>
+                    </div>
+                </div>
+                <div style="text-align:right;">
+                    <div style="display:inline-block;padding:4px 12px;border-radius:20px;font-size:12px;
+                                font-weight:600;background:#d1fae5;color:#059669;">
+                        ✓ Shortlist
+                    </div>
+                    <div style="font-size:28px;font-weight:800;color:#059669;margin-top:4px;">
+                        100.0
+                    </div>
+                    <div style="font-size:11px;color:#94a3b8;">overall score</div>
+                </div>
+            </div>
+
+            <!-- Score breakdown -->
+            <div style="display:grid;grid-template-columns:100px 1fr;gap:4px 12px;margin-bottom:16px;">
+                <div style="font-size:12px;color:#64748b;font-weight:500;">Skills</div>
+                
+    <div style="display:flex;align-items:center;gap:8px;margin:3px 0;">
+        <div style="flex:1;background:#f1f5f9;border-radius:6px;height:18px;overflow:hidden;">
+            <div style="width:99.99%;background:#059669;height:100%;border-radius:6px;transition:width .3s;"></div>
+        </div>
+        <span style="min-width:45px;text-align:right;font-weight:600;font-size:13px;color:#059669;">100.0</span>
+        <span style="color:#94a3b8;font-size:11px;margin-left:6px;">×40%</span>
+    </div>
+                <div style="font-size:12px;color:#64748b;font-weight:500;">Experience</div>
+                
+    <div style="display:flex;align-items:center;gap:8px;margin:3px 0;">
+        <div style="flex:1;background:#f1f5f9;border-radius:6px;height:18px;overflow:hidden;">
+            <div style="width:100%;background:#059669;height:100%;border-radius:6px;transition:width .3s;"></div>
+        </div>
+        <span style="min-width:45px;text-align:right;font-weight:600;font-size:13px;color:#059669;">100.0</span>
+        <span style="color:#94a3b8;font-size:11px;margin-left:6px;">×30%</span>
+    </div>
+                <div style="font-size:12px;color:#64748b;font-weight:500;">Education</div>
+                
+    <div style="display:flex;align-items:center;gap:8px;margin:3px 0;">
+        <div style="flex:1;background:#f1f5f9;border-radius:6px;height:18px;overflow:hidden;">
+            <div style="width:100%;background:#059669;height:100%;border-radius:6px;transition:width .3s;"></div>
+        </div>
+        <span style="min-width:45px;text-align:right;font-weight:600;font-size:13px;color:#059669;">100.0</span>
+        <span style="color:#94a3b8;font-size:11px;margin-left:6px;">×15%</span>
+    </div>
+                <div style="font-size:12px;color:#64748b;font-weight:500;">Keywords</div>
+                
+    <div style="display:flex;align-items:center;gap:8px;margin:3px 0;">
+        <div style="flex:1;background:#f1f5f9;border-radius:6px;height:18px;overflow:hidden;">
+            <div style="width:100%;background:#059669;height:100%;border-radius:6px;transition:width .3s;"></div>
+        </div>
+        <span style="min-width:45px;text-align:right;font-weight:600;font-size:13px;color:#059669;">100.0</span>
+        <span style="color:#94a3b8;font-size:11px;margin-left:6px;">×15%</span>
+    </div>
+            </div>
+
+            <!-- Semantic score callout -->
+            <div style="background:#f8fafc;border-radius:8px;padding:10px 14px;margin-bottom:12px;
+                        display:flex;gap:16px;font-size:12px;">
+                <div><span style="color:#64748b;">Lexical skills:</span>
+                     <b>5/5</b> matched</div>
+                <div><span style="color:#64748b;">Semantic score:</span> <b>100.0</b>/100</div>
+                <div><span style="color:#64748b;">Blended skills:</span> <b>100.0</b>
+                     <span style="color:#94a3b8;">(70% lexical + 30% semantic)</span></div>
+            </div>
+
+            <!-- Skills chips -->
+            <div style="display:flex;gap:24px;margin-bottom:12px;">
+                <div>
+                    <div style="font-size:11px;font-weight:600;color:#64748b;text-transform:uppercase;
+                                letter-spacing:.05em;margin-bottom:4px;">Matched Skills</div>
+                    <span style="display:inline-block;padding:2px 8px;border-radius:12px;font-size:11px;font-weight:500;background:#d1fae5;color:#059669;border:1px solid #86efac;margin:2px;">gcp</span> <span style="display:inline-block;padding:2px 8px;border-radius:12px;font-size:11px;font-weight:500;background:#d1fae5;color:#059669;border:1px solid #86efac;margin:2px;">kubernetes</span> <span style="display:inline-block;padding:2px 8px;border-radius:12px;font-size:11px;font-weight:500;background:#d1fae5;color:#059669;border:1px solid #86efac;margin:2px;">python</span> <span style="display:inline-block;padding:2px 8px;border-radius:12px;font-size:11px;font-weight:500;background:#d1fae5;color:#059669;border:1px solid #86efac;margin:2px;">pytorch</span> <span style="display:inline-block;padding:2px 8px;border-radius:12px;font-size:11px;font-weight:500;background:#d1fae5;color:#059669;border:1px solid #86efac;margin:2px;">sql</span>
+                </div>
+                <div>
+                    <div style="font-size:11px;font-weight:600;color:#64748b;text-transform:uppercase;
+                                letter-spacing:.05em;margin-bottom:4px;">Missing Skills</div>
+                    <span style="color:#94a3b8;font-size:12px;">—</span>
+                </div>
+            </div>
+
+            <!-- Hard filter -->
+            <div style="font-size:12px;color:#059669;font-weight:500;">
+                ✓ Hard filters: PASSED
+                <span style="color:#94a3b8;font-weight:400;margin-left:8px;">
+                    loc=✓
+                    · auth=✓
+                    · exp=✓
+                </span>
+            </div>
+        </div>
+        <div style="background:white;border-radius:16px;padding:24px;box-shadow:0 1px 3px rgba(0,0,0,.08);
+                    border-left:4px solid #dc2626;">
+            <!-- Header -->
+            <div style="display:flex;justify-content:space-between;align-items:flex-start;margin-bottom:16px;">
+                <div style="display:flex;align-items:center;gap:12px;">
+                    <div style="width:40px;height:40px;border-radius:50%;background:linear-gradient(135deg,#6366f1,#8b5cf6);
+                                display:flex;align-items:center;justify-content:center;color:white;font-weight:700;font-size:16px;">
+                        #2
+                    </div>
+                    <div>
+                        <div style="font-weight:700;font-size:16px;color:#1e293b;">David Okafor</div>
+                        <div style="font-size:12px;color:#64748b;margin-top:2px;">8 yrs, perfect skills, but located in Canada → hard filter reject.</div>
+                    </div>
+                </div>
+                <div style="text-align:right;">
+                    <div style="display:inline-block;padding:4px 12px;border-radius:20px;font-size:12px;
+                                font-weight:600;background:#fee2e2;color:#dc2626;">
+                        ✗ Reject
+                    </div>
+                    <div style="font-size:28px;font-weight:800;color:#dc2626;margin-top:4px;">
+                        100.0
+                    </div>
+                    <div style="font-size:11px;color:#94a3b8;">overall score</div>
+                </div>
+            </div>
+
+            <!-- Score breakdown -->
+            <div style="display:grid;grid-template-columns:100px 1fr;gap:4px 12px;margin-bottom:16px;">
+                <div style="font-size:12px;color:#64748b;font-weight:500;">Skills</div>
+                
+    <div style="display:flex;align-items:center;gap:8px;margin:3px 0;">
+        <div style="flex:1;background:#f1f5f9;border-radius:6px;height:18px;overflow:hidden;">
+            <div style="width:99.99%;background:#059669;height:100%;border-radius:6px;transition:width .3s;"></div>
+        </div>
+        <span style="min-width:45px;text-align:right;font-weight:600;font-size:13px;color:#059669;">100.0</span>
+        <span style="color:#94a3b8;font-size:11px;margin-left:6px;">×40%</span>
+    </div>
+                <div style="font-size:12px;color:#64748b;font-weight:500;">Experience</div>
+                
+    <div style="display:flex;align-items:center;gap:8px;margin:3px 0;">
+        <div style="flex:1;background:#f1f5f9;border-radius:6px;height:18px;overflow:hidden;">
+            <div style="width:100%;background:#059669;height:100%;border-radius:6px;transition:width .3s;"></div>
+        </div>
+        <span style="min-width:45px;text-align:right;font-weight:600;font-size:13px;color:#059669;">100.0</span>
+        <span style="color:#94a3b8;font-size:11px;margin-left:6px;">×30%</span>
+    </div>
+                <div style="font-size:12px;color:#64748b;font-weight:500;">Education</div>
+                
+    <div style="display:flex;align-items:center;gap:8px;margin:3px 0;">
+        <div style="flex:1;background:#f1f5f9;border-radius:6px;height:18px;overflow:hidden;">
+            <div style="width:100%;background:#059669;height:100%;border-radius:6px;transition:width .3s;"></div>
+        </div>
+        <span style="min-width:45px;text-align:right;font-weight:600;font-size:13px;color:#059669;">100.0</span>
+        <span style="color:#94a3b8;font-size:11px;margin-left:6px;">×15%</span>
+    </div>
+                <div style="font-size:12px;color:#64748b;font-weight:500;">Keywords</div>
+                
+    <div style="display:flex;align-items:center;gap:8px;margin:3px 0;">
+        <div style="flex:1;background:#f1f5f9;border-radius:6px;height:18px;overflow:hidden;">
+            <div style="width:100%;background:#059669;height:100%;border-radius:6px;transition:width .3s;"></div>
+        </div>
+        <span style="min-width:45px;text-align:right;font-weight:600;font-size:13px;color:#059669;">100.0</span>
+        <span style="color:#94a3b8;font-size:11px;margin-left:6px;">×15%</span>
+    </div>
+            </div>
+
+            <!-- Semantic score callout -->
+            <div style="background:#f8fafc;border-radius:8px;padding:10px 14px;margin-bottom:12px;
+                        display:flex;gap:16px;font-size:12px;">
+                <div><span style="color:#64748b;">Lexical skills:</span>
+                     <b>5/5</b> matched</div>
+                <div><span style="color:#64748b;">Semantic score:</span> <b>100.0</b>/100</div>
+                <div><span style="color:#64748b;">Blended skills:</span> <b>100.0</b>
+                     <span style="color:#94a3b8;">(70% lexical + 30% semantic)</span></div>
+            </div>
+
+            <!-- Skills chips -->
+            <div style="display:flex;gap:24px;margin-bottom:12px;">
+                <div>
+                    <div style="font-size:11px;font-weight:600;color:#64748b;text-transform:uppercase;
+                                letter-spacing:.05em;margin-bottom:4px;">Matched Skills</div>
+                    <span style="display:inline-block;padding:2px 8px;border-radius:12px;font-size:11px;font-weight:500;background:#d1fae5;color:#059669;border:1px solid #86efac;margin:2px;">gcp</span> <span style="display:inline-block;padding:2px 8px;border-radius:12px;font-size:11px;font-weight:500;background:#d1fae5;color:#059669;border:1px solid #86efac;margin:2px;">kubernetes</span> <span style="display:inline-block;padding:2px 8px;border-radius:12px;font-size:11px;font-weight:500;background:#d1fae5;color:#059669;border:1px solid #86efac;margin:2px;">python</span> <span style="display:inline-block;padding:2px 8px;border-radius:12px;font-size:11px;font-weight:500;background:#d1fae5;color:#059669;border:1px solid #86efac;margin:2px;">pytorch</span> <span style="display:inline-block;padding:2px 8px;border-radius:12px;font-size:11px;font-weight:500;background:#d1fae5;color:#059669;border:1px solid #86efac;margin:2px;">sql</span>
+                </div>
+                <div>
+                    <div style="font-size:11px;font-weight:600;color:#64748b;text-transform:uppercase;
+                                letter-spacing:.05em;margin-bottom:4px;">Missing Skills</div>
+                    <span style="color:#94a3b8;font-size:12px;">—</span>
+                </div>
+            </div>
+
+            <!-- Hard filter -->
+            <div style="font-size:12px;color:#dc2626;font-weight:500;">
+                ✗ Hard filters: FAILED
+                <span style="color:#94a3b8;font-weight:400;margin-left:8px;">
+                    loc=✗ CA
+                    · auth=✓
+                    · exp=✓
+                </span>
+            </div>
+        </div>
+        <div style="background:white;border-radius:16px;padding:24px;box-shadow:0 1px 3px rgba(0,0,0,.08);
+                    border-left:4px solid #059669;">
+            <!-- Header -->
+            <div style="display:flex;justify-content:space-between;align-items:flex-start;margin-bottom:16px;">
+                <div style="display:flex;align-items:center;gap:12px;">
+                    <div style="width:40px;height:40px;border-radius:50%;background:linear-gradient(135deg,#6366f1,#8b5cf6);
+                                display:flex;align-items:center;justify-content:center;color:white;font-weight:700;font-size:16px;">
+                        #3
+                    </div>
+                    <div>
+                        <div style="font-weight:700;font-size:16px;color:#1e293b;">Carol Johansson</div>
+                        <div style="font-size:12px;color:#64748b;margin-top:2px;">6 yrs data eng. Masters. Good overlap but weak on ML-specific skills.</div>
+                    </div>
+                </div>
+                <div style="text-align:right;">
+                    <div style="display:inline-block;padding:4px 12px;border-radius:20px;font-size:12px;
+                                font-weight:600;background:#d1fae5;color:#059669;">
+                        ✓ Shortlist
+                    </div>
+                    <div style="font-size:28px;font-weight:800;color:#059669;margin-top:4px;">
+                        76.1
+                    </div>
+                    <div style="font-size:11px;color:#94a3b8;">overall score</div>
+                </div>
+            </div>
+
+            <!-- Score breakdown -->
+            <div style="display:grid;grid-template-columns:100px 1fr;gap:4px 12px;margin-bottom:16px;">
+                <div style="font-size:12px;color:#64748b;font-weight:500;">Skills</div>
+                
+    <div style="display:flex;align-items:center;gap:8px;margin:3px 0;">
+        <div style="flex:1;background:#f1f5f9;border-radius:6px;height:18px;overflow:hidden;">
+            <div style="width:59.06%;background:#d97706;height:100%;border-radius:6px;transition:width .3s;"></div>
+        </div>
+        <span style="min-width:45px;text-align:right;font-weight:600;font-size:13px;color:#d97706;">59.1</span>
+        <span style="color:#94a3b8;font-size:11px;margin-left:6px;">×40%</span>
+    </div>
+                <div style="font-size:12px;color:#64748b;font-weight:500;">Experience</div>
+                
+    <div style="display:flex;align-items:center;gap:8px;margin:3px 0;">
+        <div style="flex:1;background:#f1f5f9;border-radius:6px;height:18px;overflow:hidden;">
+            <div style="width:100%;background:#059669;height:100%;border-radius:6px;transition:width .3s;"></div>
+        </div>
+        <span style="min-width:45px;text-align:right;font-weight:600;font-size:13px;color:#059669;">100.0</span>
+        <span style="color:#94a3b8;font-size:11px;margin-left:6px;">×30%</span>
+    </div>
+                <div style="font-size:12px;color:#64748b;font-weight:500;">Education</div>
+                
+    <div style="display:flex;align-items:center;gap:8px;margin:3px 0;">
+        <div style="flex:1;background:#f1f5f9;border-radius:6px;height:18px;overflow:hidden;">
+            <div style="width:100%;background:#059669;height:100%;border-radius:6px;transition:width .3s;"></div>
+        </div>
+        <span style="min-width:45px;text-align:right;font-weight:600;font-size:13px;color:#059669;">100.0</span>
+        <span style="color:#94a3b8;font-size:11px;margin-left:6px;">×15%</span>
+    </div>
+                <div style="font-size:12px;color:#64748b;font-weight:500;">Keywords</div>
+                
+    <div style="display:flex;align-items:center;gap:8px;margin:3px 0;">
+        <div style="flex:1;background:#f1f5f9;border-radius:6px;height:18px;overflow:hidden;">
+            <div style="width:50.0%;background:#dc2626;height:100%;border-radius:6px;transition:width .3s;"></div>
+        </div>
+        <span style="min-width:45px;text-align:right;font-weight:600;font-size:13px;color:#dc2626;">50.0</span>
+        <span style="color:#94a3b8;font-size:11px;margin-left:6px;">×15%</span>
+    </div>
+            </div>
+
+            <!-- Semantic score callout -->
+            <div style="background:#f8fafc;border-radius:8px;padding:10px 14px;margin-bottom:12px;
+                        display:flex;gap:16px;font-size:12px;">
+                <div><span style="color:#64748b;">Lexical skills:</span>
+                     <b>3/5</b> matched</div>
+                <div><span style="color:#64748b;">Semantic score:</span> <b>56.9</b>/100</div>
+                <div><span style="color:#64748b;">Blended skills:</span> <b>59.1</b>
+                     <span style="color:#94a3b8;">(70% lexical + 30% semantic)</span></div>
+            </div>
+
+            <!-- Skills chips -->
+            <div style="display:flex;gap:24px;margin-bottom:12px;">
+                <div>
+                    <div style="font-size:11px;font-weight:600;color:#64748b;text-transform:uppercase;
+                                letter-spacing:.05em;margin-bottom:4px;">Matched Skills</div>
+                    <span style="display:inline-block;padding:2px 8px;border-radius:12px;font-size:11px;font-weight:500;background:#d1fae5;color:#059669;border:1px solid #86efac;margin:2px;">gcp</span> <span style="display:inline-block;padding:2px 8px;border-radius:12px;font-size:11px;font-weight:500;background:#d1fae5;color:#059669;border:1px solid #86efac;margin:2px;">python</span> <span style="display:inline-block;padding:2px 8px;border-radius:12px;font-size:11px;font-weight:500;background:#d1fae5;color:#059669;border:1px solid #86efac;margin:2px;">sql</span>
+                </div>
+                <div>
+                    <div style="font-size:11px;font-weight:600;color:#64748b;text-transform:uppercase;
+                                letter-spacing:.05em;margin-bottom:4px;">Missing Skills</div>
+                    <span style="display:inline-block;padding:2px 8px;border-radius:12px;font-size:11px;font-weight:500;background:#fee2e2;color:#dc2626;border:1px solid #fca5a5;margin:2px;">kubernetes</span> <span style="display:inline-block;padding:2px 8px;border-radius:12px;font-size:11px;font-weight:500;background:#fee2e2;color:#dc2626;border:1px solid #fca5a5;margin:2px;">pytorch</span>
+                </div>
+            </div>
+
+            <!-- Hard filter -->
+            <div style="font-size:12px;color:#059669;font-weight:500;">
+                ✓ Hard filters: PASSED
+                <span style="color:#94a3b8;font-weight:400;margin-left:8px;">
+                    loc=✓
+                    · auth=✓
+                    · exp=✓
+                </span>
+            </div>
+        </div>
+        <div style="background:white;border-radius:16px;padding:24px;box-shadow:0 1px 3px rgba(0,0,0,.08);
+                    border-left:4px solid #d97706;">
+            <!-- Header -->
+            <div style="display:flex;justify-content:space-between;align-items:flex-start;margin-bottom:16px;">
+                <div style="display:flex;align-items:center;gap:12px;">
+                    <div style="width:40px;height:40px;border-radius:50%;background:linear-gradient(135deg,#6366f1,#8b5cf6);
+                                display:flex;align-items:center;justify-content:center;color:white;font-weight:700;font-size:16px;">
+                        #4
+                    </div>
+                    <div>
+                        <div style="font-weight:700;font-size:16px;color:#1e293b;">Bob Martinez</div>
+                        <div style="font-size:12px;color:#64748b;margin-top:2px;">4 yrs at startup. Bachelors. Strong on Python/SQL, missing K8s/GCP.</div>
+                    </div>
+                </div>
+                <div style="text-align:right;">
+                    <div style="display:inline-block;padding:4px 12px;border-radius:20px;font-size:12px;
+                                font-weight:600;background:#fef3c7;color:#d97706;">
+                        ⚠ Manual Review
+                    </div>
+                    <div style="font-size:28px;font-weight:800;color:#d97706;margin-top:4px;">
+                        63.2
+                    </div>
+                    <div style="font-size:11px;color:#94a3b8;">overall score</div>
+                </div>
+            </div>
+
+            <!-- Score breakdown -->
+            <div style="display:grid;grid-template-columns:100px 1fr;gap:4px 12px;margin-bottom:16px;">
+                <div style="font-size:12px;color:#64748b;font-weight:500;">Skills</div>
+                
+    <div style="display:flex;align-items:center;gap:8px;margin:3px 0;">
+        <div style="flex:1;background:#f1f5f9;border-radius:6px;height:18px;overflow:hidden;">
+            <div style="width:56.74%;background:#d97706;height:100%;border-radius:6px;transition:width .3s;"></div>
+        </div>
+        <span style="min-width:45px;text-align:right;font-weight:600;font-size:13px;color:#d97706;">56.7</span>
+        <span style="color:#94a3b8;font-size:11px;margin-left:6px;">×40%</span>
+    </div>
+                <div style="font-size:12px;color:#64748b;font-weight:500;">Experience</div>
+                
+    <div style="display:flex;align-items:center;gap:8px;margin:3px 0;">
+        <div style="flex:1;background:#f1f5f9;border-radius:6px;height:18px;overflow:hidden;">
+            <div style="width:80.0%;background:#059669;height:100%;border-radius:6px;transition:width .3s;"></div>
+        </div>
+        <span style="min-width:45px;text-align:right;font-weight:600;font-size:13px;color:#059669;">80.0</span>
+        <span style="color:#94a3b8;font-size:11px;margin-left:6px;">×30%</span>
+    </div>
+                <div style="font-size:12px;color:#64748b;font-weight:500;">Education</div>
+                
+    <div style="display:flex;align-items:center;gap:8px;margin:3px 0;">
+        <div style="flex:1;background:#f1f5f9;border-radius:6px;height:18px;overflow:hidden;">
+            <div style="width:60.0%;background:#d97706;height:100%;border-radius:6px;transition:width .3s;"></div>
+        </div>
+        <span style="min-width:45px;text-align:right;font-weight:600;font-size:13px;color:#d97706;">60.0</span>
+        <span style="color:#94a3b8;font-size:11px;margin-left:6px;">×15%</span>
+    </div>
+                <div style="font-size:12px;color:#64748b;font-weight:500;">Keywords</div>
+                
+    <div style="display:flex;align-items:center;gap:8px;margin:3px 0;">
+        <div style="flex:1;background:#f1f5f9;border-radius:6px;height:18px;overflow:hidden;">
+            <div style="width:50.0%;background:#dc2626;height:100%;border-radius:6px;transition:width .3s;"></div>
+        </div>
+        <span style="min-width:45px;text-align:right;font-weight:600;font-size:13px;color:#dc2626;">50.0</span>
+        <span style="color:#94a3b8;font-size:11px;margin-left:6px;">×15%</span>
+    </div>
+            </div>
+
+            <!-- Semantic score callout -->
+            <div style="background:#f8fafc;border-radius:8px;padding:10px 14px;margin-bottom:12px;
+                        display:flex;gap:16px;font-size:12px;">
+                <div><span style="color:#64748b;">Lexical skills:</span>
+                     <b>2/5</b> matched</div>
+                <div><span style="color:#64748b;">Semantic score:</span> <b>95.8</b>/100</div>
+                <div><span style="color:#64748b;">Blended skills:</span> <b>56.7</b>
+                     <span style="color:#94a3b8;">(70% lexical + 30% semantic)</span></div>
+            </div>
+
+            <!-- Skills chips -->
+            <div style="display:flex;gap:24px;margin-bottom:12px;">
+                <div>
+                    <div style="font-size:11px;font-weight:600;color:#64748b;text-transform:uppercase;
+                                letter-spacing:.05em;margin-bottom:4px;">Matched Skills</div>
+                    <span style="display:inline-block;padding:2px 8px;border-radius:12px;font-size:11px;font-weight:500;background:#d1fae5;color:#059669;border:1px solid #86efac;margin:2px;">python</span> <span style="display:inline-block;padding:2px 8px;border-radius:12px;font-size:11px;font-weight:500;background:#d1fae5;color:#059669;border:1px solid #86efac;margin:2px;">sql</span>
+                </div>
+                <div>
+                    <div style="font-size:11px;font-weight:600;color:#64748b;text-transform:uppercase;
+                                letter-spacing:.05em;margin-bottom:4px;">Missing Skills</div>
+                    <span style="display:inline-block;padding:2px 8px;border-radius:12px;font-size:11px;font-weight:500;background:#fee2e2;color:#dc2626;border:1px solid #fca5a5;margin:2px;">gcp</span> <span style="display:inline-block;padding:2px 8px;border-radius:12px;font-size:11px;font-weight:500;background:#fee2e2;color:#dc2626;border:1px solid #fca5a5;margin:2px;">kubernetes</span> <span style="display:inline-block;padding:2px 8px;border-radius:12px;font-size:11px;font-weight:500;background:#fee2e2;color:#dc2626;border:1px solid #fca5a5;margin:2px;">pytorch</span>
+                </div>
+            </div>
+
+            <!-- Hard filter -->
+            <div style="font-size:12px;color:#059669;font-weight:500;">
+                ✓ Hard filters: PASSED
+                <span style="color:#94a3b8;font-weight:400;margin-left:8px;">
+                    loc=✓
+                    · auth=✓
+                    · exp=✓
+                </span>
+            </div>
+        </div>
+        <div style="background:white;border-radius:16px;padding:24px;box-shadow:0 1px 3px rgba(0,0,0,.08);
+                    border-left:4px solid #dc2626;">
+            <!-- Header -->
+            <div style="display:flex;justify-content:space-between;align-items:flex-start;margin-bottom:16px;">
+                <div style="display:flex;align-items:center;gap:12px;">
+                    <div style="width:40px;height:40px;border-radius:50%;background:linear-gradient(135deg,#6366f1,#8b5cf6);
+                                display:flex;align-items:center;justify-content:center;color:white;font-weight:700;font-size:16px;">
+                        #5
+                    </div>
+                    <div>
+                        <div style="font-weight:700;font-size:16px;color:#1e293b;">Elena Petrov</div>
+                        <div style="font-size:12px;color:#64748b;margin-top:2px;">2 yrs JVM backend. No degree listed. Minimal overlap.</div>
+                    </div>
+                </div>
+                <div style="text-align:right;">
+                    <div style="display:inline-block;padding:4px 12px;border-radius:20px;font-size:12px;
+                                font-weight:600;background:#fee2e2;color:#dc2626;">
+                        ✗ Reject
+                    </div>
+                    <div style="font-size:28px;font-weight:800;color:#dc2626;margin-top:4px;">
+                        15.9
+                    </div>
+                    <div style="font-size:11px;color:#94a3b8;">overall score</div>
+                </div>
+            </div>
+
+            <!-- Score breakdown -->
+            <div style="display:grid;grid-template-columns:100px 1fr;gap:4px 12px;margin-bottom:16px;">
+                <div style="font-size:12px;color:#64748b;font-weight:500;">Skills</div>
+                
+    <div style="display:flex;align-items:center;gap:8px;margin:3px 0;">
+        <div style="flex:1;background:#f1f5f9;border-radius:6px;height:18px;overflow:hidden;">
+            <div style="width:9.81%;background:#dc2626;height:100%;border-radius:6px;transition:width .3s;"></div>
+        </div>
+        <span style="min-width:45px;text-align:right;font-weight:600;font-size:13px;color:#dc2626;">9.8</span>
+        <span style="color:#94a3b8;font-size:11px;margin-left:6px;">×40%</span>
+    </div>
+                <div style="font-size:12px;color:#64748b;font-weight:500;">Experience</div>
+                
+    <div style="display:flex;align-items:center;gap:8px;margin:3px 0;">
+        <div style="flex:1;background:#f1f5f9;border-radius:6px;height:18px;overflow:hidden;">
+            <div style="width:40.0%;background:#dc2626;height:100%;border-radius:6px;transition:width .3s;"></div>
+        </div>
+        <span style="min-width:45px;text-align:right;font-weight:600;font-size:13px;color:#dc2626;">40.0</span>
+        <span style="color:#94a3b8;font-size:11px;margin-left:6px;">×30%</span>
+    </div>
+                <div style="font-size:12px;color:#64748b;font-weight:500;">Education</div>
+                
+    <div style="display:flex;align-items:center;gap:8px;margin:3px 0;">
+        <div style="flex:1;background:#f1f5f9;border-radius:6px;height:18px;overflow:hidden;">
+            <div style="width:0%;background:#dc2626;height:100%;border-radius:6px;transition:width .3s;"></div>
+        </div>
+        <span style="min-width:45px;text-align:right;font-weight:600;font-size:13px;color:#dc2626;">0.0</span>
+        <span style="color:#94a3b8;font-size:11px;margin-left:6px;">×15%</span>
+    </div>
+                <div style="font-size:12px;color:#64748b;font-weight:500;">Keywords</div>
+                
+    <div style="display:flex;align-items:center;gap:8px;margin:3px 0;">
+        <div style="flex:1;background:#f1f5f9;border-radius:6px;height:18px;overflow:hidden;">
+            <div style="width:0%;background:#dc2626;height:100%;border-radius:6px;transition:width .3s;"></div>
+        </div>
+        <span style="min-width:45px;text-align:right;font-weight:600;font-size:13px;color:#dc2626;">0.0</span>
+        <span style="color:#94a3b8;font-size:11px;margin-left:6px;">×15%</span>
+    </div>
+            </div>
+
+            <!-- Semantic score callout -->
+            <div style="background:#f8fafc;border-radius:8px;padding:10px 14px;margin-bottom:12px;
+                        display:flex;gap:16px;font-size:12px;">
+                <div><span style="color:#64748b;">Lexical skills:</span>
+                     <b>0/5</b> matched</div>
+                <div><span style="color:#64748b;">Semantic score:</span> <b>32.7</b>/100</div>
+                <div><span style="color:#64748b;">Blended skills:</span> <b>9.8</b>
+                     <span style="color:#94a3b8;">(70% lexical + 30% semantic)</span></div>
+            </div>
+
+            <!-- Skills chips -->
+            <div style="display:flex;gap:24px;margin-bottom:12px;">
+                <div>
+                    <div style="font-size:11px;font-weight:600;color:#64748b;text-transform:uppercase;
+                                letter-spacing:.05em;margin-bottom:4px;">Matched Skills</div>
+                    <span style="color:#94a3b8;font-size:12px;">—</span>
+                </div>
+                <div>
+                    <div style="font-size:11px;font-weight:600;color:#64748b;text-transform:uppercase;
+                                letter-spacing:.05em;margin-bottom:4px;">Missing Skills</div>
+                    <span style="display:inline-block;padding:2px 8px;border-radius:12px;font-size:11px;font-weight:500;background:#fee2e2;color:#dc2626;border:1px solid #fca5a5;margin:2px;">gcp</span> <span style="display:inline-block;padding:2px 8px;border-radius:12px;font-size:11px;font-weight:500;background:#fee2e2;color:#dc2626;border:1px solid #fca5a5;margin:2px;">kubernetes</span> <span style="display:inline-block;padding:2px 8px;border-radius:12px;font-size:11px;font-weight:500;background:#fee2e2;color:#dc2626;border:1px solid #fca5a5;margin:2px;">python</span> <span style="display:inline-block;padding:2px 8px;border-radius:12px;font-size:11px;font-weight:500;background:#fee2e2;color:#dc2626;border:1px solid #fca5a5;margin:2px;">pytorch</span> <span style="display:inline-block;padding:2px 8px;border-radius:12px;font-size:11px;font-weight:500;background:#fee2e2;color:#dc2626;border:1px solid #fca5a5;margin:2px;">sql</span>
+                </div>
+            </div>
+
+            <!-- Hard filter -->
+            <div style="font-size:12px;color:#dc2626;font-weight:500;">
+                ✗ Hard filters: FAILED
+                <span style="color:#94a3b8;font-weight:400;margin-left:8px;">
+                    loc=✓
+                    · auth=✓
+                    · exp=✗
+                </span>
+            </div>
+        </div>
+        </div>
+
+        <!-- Footer -->
+        <div style="text-align:center;margin-top:32px;font-size:12px;color:#94a3b8;">
+            Generated by <code>server/tests/demo_ranking_visual.py</code> ·
+            Thresholds: shortlist ≥ 75 · manual_review ≥ 55 · reject &lt; 55
+        </div>
+    </div>
+</body>
+</html>
