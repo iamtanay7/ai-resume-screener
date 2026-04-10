@@ -121,6 +121,17 @@ uvicorn server.main:app --reload
 
 Runs at `http://localhost:8000`
 
+### Server Docker image
+
+Build from the repository root:
+
+```bash
+docker build -f server/Dockerfile . -t ai-resume-screener-server
+docker run -p 8080:8080 ai-resume-screener-server
+```
+
+This Dockerfile assumes the repo-root build context so `server/requirements.txt` and the `server/` package are available at build time.
+
 ### Visual Ranking Demo
 
 ```bash
