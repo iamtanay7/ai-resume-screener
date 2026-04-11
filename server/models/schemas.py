@@ -1,5 +1,5 @@
 from datetime import datetime
-from typing import Literal
+from typing import Any, Literal
 
 from pydantic import BaseModel, EmailStr, Field
 
@@ -128,6 +128,46 @@ class RankingTriggerResponse(BaseModel):
 
 
 # ── Notify ────────────────────────────────────────────────────────────────────
+
+class RankingDataPayload(BaseModel):
+    candidate_name: str
+    overall_score: float
+    matched_skills: list[str]
+    missing_skills: list[str]
+    candidate_id: str | None = None
+    job_title: str | None = None
+    score_breakdown: dict[str, int] | None = None
+    years_experience: int | None = None
+    jd_summary: str | None = None
+
+    model_config = {"extra": "allow"}
+
+
+class ExplainabilityRequest(BaseModel):
+    mode: Literal["candidate_id", "ranking_data"] = "candidate_id"
+    candidate_id: str | None = None
+    ranking_data: RankingDataPayload | dict[str, Any] | None = None
+
+
+class ExplainabilityResponse(BaseModel):
+    candidate_id: str
+    candidate_name: str
+    job_title: str
+    overall_score: int
+    years_experience: int
+    decision: Literal["shortlist", "manual_review", "reject"]
+    summary: str
+    strengths: list[str]
+    weaknesses: list[str]
+    recommendation: str
+    score_breakdown: dict[str, int]
+    matched_skills: list[str]
+    missing_skills: list[str]
+    confidence_score: int
+    jd_summary: str
+    fairness_note: str
+    source: str
+
 
 class NotifyResponse(BaseModel):
     message: str

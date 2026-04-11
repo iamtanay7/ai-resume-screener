@@ -7,11 +7,11 @@ import re
 from dataclasses import dataclass
 
 import vertexai
-from config import settings
 from google.api_core.client_options import ClientOptions
 from google.cloud import documentai
-from models.schemas import DocumentSection, EmbeddingRecord, ParsedDocument
-from services import firestore_db, storage
+from server.config import settings
+from server.models.schemas import DocumentSection, EmbeddingRecord, ParsedDocument
+from server.services import firestore_db, storage
 from vertexai.language_models import TextEmbeddingModel
 
 logger = logging.getLogger(__name__)

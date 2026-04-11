@@ -1,6 +1,7 @@
 import type {
   ProcessingStatusResponse,
   Candidate,
+  ExplainabilityResponse,
   UploadJDResponse,
   UploadResumeResponse,
 } from "./types";
@@ -83,4 +84,18 @@ export async function getJDStatus(
     headers: { "Content-Type": "application/json" },
   });
   return handleResponse<ProcessingStatusResponse>(res);
+}
+
+export async function generateExplanation(
+  candidateId: string
+): Promise<ExplainabilityResponse> {
+  const res = await fetch(`${BASE_URL}/explainability/generate`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({
+      mode: "candidate_id",
+      candidate_id: candidateId,
+    }),
+  });
+  return handleResponse<ExplainabilityResponse>(res);
 }

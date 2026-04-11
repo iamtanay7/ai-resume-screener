@@ -8,8 +8,8 @@ import logging
 
 from fastapi import APIRouter, HTTPException, status
 
-from models.schemas import IngestionResponse, PubSubPushEnvelope
-from services.nlp_pipeline import UploadEvent, process_upload_event
+from server.models.schemas import IngestionResponse, PubSubPushEnvelope
+from server.services.nlp_pipeline import UploadEvent, process_upload_event
 
 logger = logging.getLogger(__name__)
 router = APIRouter(prefix="/events", tags=["ingestion"])

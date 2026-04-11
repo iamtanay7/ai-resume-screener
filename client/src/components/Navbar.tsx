@@ -31,6 +31,12 @@ export function Navbar() {
           >
             Results
           </Link>
+          <Link
+            href="/dashboard"
+            className="hover:text-primary-600 transition-colors"
+          >
+            Dashboard
+          </Link>
         </nav>
       </div>
     </header>
