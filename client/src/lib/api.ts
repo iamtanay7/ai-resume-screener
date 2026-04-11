@@ -1,10 +1,11 @@
 import type {
+  ProcessingStatusResponse,
   Candidate,
   UploadJDResponse,
   UploadResumeResponse,
 } from "./types";
 
-const BASE_URL = process.env.NEXT_PUBLIC_API_URL ?? "http://localhost:8080";
+const BASE_URL = process.env.NEXT_PUBLIC_API_URL ?? "http://localhost:8000";
 
 async function handleResponse<T>(res: Response): Promise<T> {
   if (!res.ok) {
@@ -62,4 +63,24 @@ export async function approveEmail(candidateId: string): Promise<void> {
     headers: { "Content-Type": "application/json" },
   });
   return handleResponse<void>(res);
+}
+
+export async function getResumeStatus(
+  candidateId: string
+): Promise<ProcessingStatusResponse> {
+  const res = await fetch(`${BASE_URL}/upload/resume/${candidateId}/status`, {
+    method: "GET",
+    headers: { "Content-Type": "application/json" },
+  });
+  return handleResponse<ProcessingStatusResponse>(res);
+}
+
+export async function getJDStatus(
+  jobId: string
+): Promise<ProcessingStatusResponse> {
+  const res = await fetch(`${BASE_URL}/upload/jd/${jobId}/status`, {
+    method: "GET",
+    headers: { "Content-Type": "application/json" },
+  });
+  return handleResponse<ProcessingStatusResponse>(res);
 }

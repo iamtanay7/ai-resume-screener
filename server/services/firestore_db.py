@@ -11,6 +11,7 @@ _client: firestore.Client | None = None
 
 COLLECTION_CANDIDATES = "candidates"
 COLLECTION_JOBS = "jobs"
+SUBCOLLECTION_NLP = "nlpArtifacts"
 
 
 def _read_nlp_artifacts_subcollection(doc_ref: Any) -> dict[str, Any]:
@@ -211,6 +212,13 @@ def get_candidate(candidate_id: str) -> dict[str, Any] | None:
     return doc.to_dict() if doc.exists else None
 
 
+def get_job(job_id: str) -> dict[str, Any] | None:
+    """Fetch a single job document."""
+    db = _get_client()
+    doc = db.collection(COLLECTION_JOBS).document(job_id).get()
+    return doc.to_dict() if doc.exists else None
+
+
 def approve_email(candidate_id: str) -> None:
     """Mark a candidate's notification email as approved by the recruiter."""
     db = _get_client()
@@ -219,5 +227,51 @@ def approve_email(candidate_id: str) -> None:
         {
             "emailApproved": True,
             "emailApprovedAt": datetime.now(timezone.utc).isoformat(),
+        }
+    )
+
+
+def mark_candidate_processing(candidate_id: str, status: str, error: str | None = None) -> None:
+    """Update Tanay's NLP processing status for a candidate."""
+    db = _get_client()
+    payload: dict[str, Any] = {
+        "status": status,
+        "updatedAt": datetime.now(timezone.utc).isoformat(),
+    }
+    if error:
+        payload["processingError"] = error
+    db.collection(COLLECTION_CANDIDATES).document(candidate_id).update(payload)
+
+
+def mark_job_processing(job_id: str, status: str, error: str | None = None) -> None:
+    """Update Tanay's NLP processing status for a job description."""
+    db = _get_client()
+    payload: dict[str, Any] = {
+        "status": status,
+        "updatedAt": datetime.now(timezone.utc).isoformat(),
+    }
+    if error:
+        payload["processingError"] = error
+    db.collection(COLLECTION_JOBS).document(job_id).update(payload)
+
+
+def save_nlp_artifact(
+    parent_collection: str,
+    document_id: str,
+    artifact_id: str,
+    payload: dict[str, Any],
+) -> None:
+    """Persist parsed text, section data, and embeddings under a document subcollection."""
+    db = _get_client()
+    doc_ref = (
+        db.collection(parent_collection)
+        .document(document_id)
+        .collection(SUBCOLLECTION_NLP)
+        .document(artifact_id)
+    )
+    doc_ref.set(
+        {
+            **payload,
+            "savedAt": datetime.now(timezone.utc).isoformat(),
         }
     )

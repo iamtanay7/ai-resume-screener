@@ -14,6 +14,13 @@ from fastapi import APIRouter, Form, HTTPException, UploadFile, status
 from server.config import settings
 from server.models.schemas import UploadJDResponse, UploadResumeResponse
 from server.services import firestore_db, pubsub, storage
+from config import settings
+from models.schemas import (
+    ProcessingStatusResponse,
+    UploadJDResponse,
+    UploadResumeResponse,
+)
+from services import firestore_db, pubsub, storage
 
 logger = logging.getLogger(__name__)
 router = APIRouter(prefix="/upload", tags=["upload"])
@@ -166,4 +173,36 @@ async def upload_jd(
     return UploadJDResponse(
         jobId=job_id,
         message="Job description received. Processing has started.",
+    )
+
+
+@router.get("/resume/{candidate_id}/status", response_model=ProcessingStatusResponse)
+async def get_resume_status(candidate_id: str) -> ProcessingStatusResponse:
+    candidate = firestore_db.get_candidate(candidate_id)
+    if candidate is None:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail=f"Candidate '{candidate_id}' not found.",
+        )
+
+    return ProcessingStatusResponse(
+        documentId=candidate_id,
+        status=candidate.get("status", "uploaded"),
+        processingError=candidate.get("processingError"),
+    )
+
+
+@router.get("/jd/{job_id}/status", response_model=ProcessingStatusResponse)
+async def get_jd_status(job_id: str) -> ProcessingStatusResponse:
+    job = firestore_db.get_job(job_id)
+    if job is None:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail=f"Job '{job_id}' not found.",
+        )
+
+    return ProcessingStatusResponse(
+        documentId=job_id,
+        status=job.get("status", "uploaded"),
+        processingError=job.get("processingError"),
     )
