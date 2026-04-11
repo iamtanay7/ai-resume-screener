@@ -163,12 +163,30 @@ Runs at `http://localhost:3000`
 ### Server
 
 ```bash
-cd server
-pip install -r requirements.txt
-uvicorn main:app --reload
+pip install -r server/requirements.txt
+uvicorn server.main:app --reload
 ```
 
 Runs at `http://localhost:8000`
+
+### Server Docker image
+
+Build from the repository root:
+
+```bash
+docker build -f server/Dockerfile . -t ai-resume-screener-server
+docker run -p 8080:8080 ai-resume-screener-server
+```
+
+This Dockerfile assumes the repo-root build context so `server/requirements.txt` and the `server/` package are available at build time.
+
+### Visual Ranking Demo
+
+```bash
+python -m server.tests.demo_ranking_visual
+```
+
+This generates `server/tests/_ranking_demo.html` and opens it in your browser.
 
 ## Usage
 

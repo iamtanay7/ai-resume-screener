@@ -5,7 +5,7 @@ import logging
 
 from google.cloud import pubsub_v1
 
-from config import settings
+from server.config import settings
 
 logger = logging.getLogger(__name__)
 

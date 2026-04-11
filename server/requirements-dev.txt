@@ -1,0 +1,5 @@
+# Dev / test dependencies — includes all production deps plus testing tools
+-r requirements.txt
+pytest==8.3.4
+email-validator==2.2.0
+httpx>=0.27.0
