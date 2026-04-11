@@ -1,13 +1,13 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
 import { FileUpload } from "@/components/ui/FileUpload";
 import { Button } from "@/components/ui/Button";
 import { Card } from "@/components/ui/Card";
 import { PipelineStatus } from "@/components/PipelineStatus";
-import { uploadJD } from "@/lib/api";
-import type { PipelineStage } from "@/lib/types";
+import { getJDStatus, uploadJD } from "@/lib/api";
+import type { BackendProcessingStatus, PipelineStage } from "@/lib/types";
 
 const INITIAL_STAGES: PipelineStage[] = [
   { label: "Upload",    status: "pending" },
@@ -24,12 +24,55 @@ export default function RecruiterPage() {
   const [error, setError]     = useState<string | null>(null);
   const [jobId, setJobId]     = useState<string | null>(null);
   const [stages, setStages]   = useState<PipelineStage[]>(INITIAL_STAGES);
+  const pollRef = useRef<number | null>(null);
 
   function updateStage(idx: number, status: PipelineStage["status"]) {
     setStages((prev) =>
       prev.map((s, i) => (i === idx ? { ...s, status } : s))
     );
   }
+
+  useEffect(() => {
+    if (!jobId) return;
+
+    let cancelled = false;
+    const currentJobId = jobId;
+
+    async function poll() {
+      try {
+        const status = await getJDStatus(currentJobId);
+        if (cancelled) return;
+
+        setStages(mapJDStages(status.status));
+
+        if (status.status === "failed") {
+          setError(status.processingError ?? "Processing failed");
+          setLoading(false);
+          return;
+        }
+
+        if (status.status === "processed") {
+          setLoading(false);
+          return;
+        }
+
+        pollRef.current = window.setTimeout(poll, 1500);
+      } catch (err) {
+        if (cancelled) return;
+        setError(err instanceof Error ? err.message : "Could not fetch status");
+        setLoading(false);
+      }
+    }
+
+    poll();
+
+    return () => {
+      cancelled = true;
+      if (pollRef.current) {
+        window.clearTimeout(pollRef.current);
+      }
+    };
+  }, [jobId]);
 
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
@@ -42,14 +85,6 @@ export default function RecruiterPage() {
       updateStage(0, "processing");
       const { jobId: id } = await uploadJD(file, jobTitle.trim());
       updateStage(0, "done");
-
-      // Simulate downstream pipeline stages (real status comes from Firestore polling in prod)
-      for (let i = 1; i < INITIAL_STAGES.length; i++) {
-        updateStage(i, "processing");
-        await delay(800);
-        updateStage(i, "done");
-      }
-
       setJobId(id);
     } catch (err) {
       setError(err instanceof Error ? err.message : "Upload failed");
@@ -67,7 +102,7 @@ export default function RecruiterPage() {
         <SuccessBanner title="Job Description uploaded!" />
         <PipelineStatus stages={stages} />
         <div className="flex justify-end gap-3">
-          <Button variant="secondary" onClick={() => { setJobId(null); setStages(INITIAL_STAGES); setFile(null); setJobTitle(""); }}>
+          <Button variant="secondary" onClick={() => { setJobId(null); setStages(INITIAL_STAGES); setFile(null); setJobTitle(""); setError(null); }}>
             Upload Another
           </Button>
           <Button onClick={() => router.push(`/results?jobId=${jobId}`)}>
@@ -145,6 +180,56 @@ function SuccessBanner({ title }: { title: string }) {
   );
 }
 
-function delay(ms: number) {
-  return new Promise((r) => setTimeout(r, ms));
+function mapJDStages(status: BackendProcessingStatus): PipelineStage[] {
+  if (status === "failed") {
+    return [
+      { label: "Upload", status: "done" },
+      { label: "Parse", status: "error" },
+      { label: "Embed", status: "pending" },
+      { label: "Index", status: "pending" },
+    ];
+  }
+
+  if (status === "uploaded") {
+    return [
+      { label: "Upload", status: "done" },
+      { label: "Parse", status: "pending" },
+      { label: "Embed", status: "pending" },
+      { label: "Index", status: "pending" },
+    ];
+  }
+
+  if (status === "parsing") {
+    return [
+      { label: "Upload", status: "done" },
+      { label: "Parse", status: "processing" },
+      { label: "Embed", status: "pending" },
+      { label: "Index", status: "pending" },
+    ];
+  }
+
+  if (status === "parsed") {
+    return [
+      { label: "Upload", status: "done" },
+      { label: "Parse", status: "done" },
+      { label: "Embed", status: "pending" },
+      { label: "Index", status: "processing" },
+    ];
+  }
+
+  if (status === "embedding") {
+    return [
+      { label: "Upload", status: "done" },
+      { label: "Parse", status: "done" },
+      { label: "Embed", status: "processing" },
+      { label: "Index", status: "pending" },
+    ];
+  }
+
+  return [
+    { label: "Upload", status: "done" },
+    { label: "Parse", status: "done" },
+    { label: "Embed", status: "done" },
+    { label: "Index", status: "done" },
+  ];
 }

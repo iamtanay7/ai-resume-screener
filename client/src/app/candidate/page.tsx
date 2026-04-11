@@ -1,12 +1,12 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { FileUpload } from "@/components/ui/FileUpload";
 import { Button } from "@/components/ui/Button";
 import { Card } from "@/components/ui/Card";
 import { PipelineStatus } from "@/components/PipelineStatus";
-import { uploadResume } from "@/lib/api";
-import type { PipelineStage } from "@/lib/types";
+import { getResumeStatus, uploadResume } from "@/lib/api";
+import type { BackendProcessingStatus, PipelineStage } from "@/lib/types";
 
 const INITIAL_STAGES: PipelineStage[] = [
   { label: "Upload",  status: "pending" },
@@ -23,12 +23,57 @@ export default function CandidatePage() {
   const [error, setError]     = useState<string | null>(null);
   const [done, setDone]       = useState(false);
   const [stages, setStages]   = useState<PipelineStage[]>(INITIAL_STAGES);
+  const [candidateId, setCandidateId] = useState<string | null>(null);
+  const pollRef = useRef<number | null>(null);
 
   function updateStage(idx: number, status: PipelineStage["status"]) {
     setStages((prev) =>
       prev.map((s, i) => (i === idx ? { ...s, status } : s))
     );
   }
+
+  useEffect(() => {
+    if (!candidateId) return;
+
+    let cancelled = false;
+    const currentCandidateId = candidateId;
+
+    async function poll() {
+      try {
+        const status = await getResumeStatus(currentCandidateId);
+        if (cancelled) return;
+
+        setStages(mapResumeStages(status.status));
+
+        if (status.status === "failed") {
+          setError(status.processingError ?? "Processing failed");
+          setLoading(false);
+          return;
+        }
+
+        if (status.status === "processed") {
+          setDone(true);
+          setLoading(false);
+          return;
+        }
+
+        pollRef.current = window.setTimeout(poll, 1500);
+      } catch (err) {
+        if (cancelled) return;
+        setError(err instanceof Error ? err.message : "Could not fetch status");
+        setLoading(false);
+      }
+    }
+
+    poll();
+
+    return () => {
+      cancelled = true;
+      if (pollRef.current) {
+        window.clearTimeout(pollRef.current);
+      }
+    };
+  }, [candidateId]);
 
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
@@ -39,16 +84,9 @@ export default function CandidatePage() {
 
     try {
       updateStage(0, "processing");
-      await uploadResume(file, email.trim(), name.trim());
+      const { candidateId } = await uploadResume(file, email.trim(), name.trim());
       updateStage(0, "done");
-
-      for (let i = 1; i < INITIAL_STAGES.length; i++) {
-        updateStage(i, "processing");
-        await delay(700);
-        updateStage(i, "done");
-      }
-
-      setDone(true);
+      setCandidateId(candidateId);
     } catch (err) {
       setError(err instanceof Error ? err.message : "Upload failed");
       setStages((prev) =>
@@ -83,6 +121,8 @@ export default function CandidatePage() {
               setFile(null);
               setEmail("");
               setName("");
+              setCandidateId(null);
+              setError(null);
             }}
           >
             Submit Another Resume
@@ -188,6 +228,56 @@ function TextField({
   );
 }
 
-function delay(ms: number) {
-  return new Promise((r) => setTimeout(r, ms));
+function mapResumeStages(status: BackendProcessingStatus): PipelineStage[] {
+  if (status === "failed") {
+    return [
+      { label: "Upload", status: "done" },
+      { label: "Parse", status: "error" },
+      { label: "Embed", status: "pending" },
+      { label: "Queue", status: "pending" },
+    ];
+  }
+
+  if (status === "uploaded") {
+    return [
+      { label: "Upload", status: "done" },
+      { label: "Parse", status: "pending" },
+      { label: "Embed", status: "pending" },
+      { label: "Queue", status: "pending" },
+    ];
+  }
+
+  if (status === "parsing") {
+    return [
+      { label: "Upload", status: "done" },
+      { label: "Parse", status: "processing" },
+      { label: "Embed", status: "pending" },
+      { label: "Queue", status: "pending" },
+    ];
+  }
+
+  if (status === "parsed") {
+    return [
+      { label: "Upload", status: "done" },
+      { label: "Parse", status: "done" },
+      { label: "Embed", status: "pending" },
+      { label: "Queue", status: "processing" },
+    ];
+  }
+
+  if (status === "embedding") {
+    return [
+      { label: "Upload", status: "done" },
+      { label: "Parse", status: "done" },
+      { label: "Embed", status: "processing" },
+      { label: "Queue", status: "pending" },
+    ];
+  }
+
+  return [
+    { label: "Upload", status: "done" },
+    { label: "Parse", status: "done" },
+    { label: "Embed", status: "done" },
+    { label: "Queue", status: "done" },
+  ];
 }
