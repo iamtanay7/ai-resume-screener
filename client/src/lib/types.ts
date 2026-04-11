@@ -62,3 +62,23 @@ export interface ApiError {
   message: string;
   code?: string;
 }
+
+export interface ExplainabilityResponse {
+  candidate_id: string;
+  candidate_name: string;
+  job_title: string;
+  overall_score: number;
+  years_experience: number;
+  decision: CandidateStatus;
+  summary: string;
+  strengths: string[];
+  weaknesses: string[];
+  recommendation: string;
+  score_breakdown: Record<string, number>;
+  matched_skills: string[];
+  missing_skills: string[];
+  confidence_score: number;
+  jd_summary: string;
+  fairness_note: string;
+  source: string;
+}

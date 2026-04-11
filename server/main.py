@@ -1,7 +1,4 @@
-"""
-AI Resume Screener — Upload Service
-Raj's Cloud Run backend: receive → validate → GCS → Firestore → Pub/Sub
-"""
+"""AI Resume Screener backend entrypoint."""
 
 import logging
 
@@ -9,9 +6,7 @@ from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 
 from server.config import settings
-from server.routers import notify, ranking, results, upload
-from config import settings
-from routers import ingest, notify, results, upload
+from server.routers import explainability, ingest, notify, ranking, results, upload
 
 logging.basicConfig(
     level=logging.INFO,
@@ -19,13 +14,11 @@ logging.basicConfig(
 )
 
 app = FastAPI(
-    title="AI Resume Screener — Upload Service",
+    title="AI Resume Screener Backend",
     description=(
-        "Entry point for resume and JD uploads. "
-        "Validates files, stores them in Cloud Storage, "
-        "writes metadata to Firestore, and fires Pub/Sub events."
+        "Resume and JD upload, NLP processing, ranking, notifications, and explainability APIs."
     ),
-    version="1.0.0",
+    version="1.1.0",
 )
 
 app.add_middleware(
@@ -41,8 +34,9 @@ app.include_router(ranking.router)
 app.include_router(ingest.router)
 app.include_router(results.router)
 app.include_router(notify.router)
+app.include_router(explainability.router)
 
 
 @app.get("/health", tags=["health"])
 async def health_check() -> dict[str, str]:
-    return {"status": "ok", "service": "upload-service"}
+    return {"status": "ok", "service": "ai-resume-screener-backend"}
