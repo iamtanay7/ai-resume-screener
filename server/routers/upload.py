@@ -27,6 +27,7 @@ ALLOWED_MIME_TYPES = {
     "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
 }
 ALLOWED_EXTENSIONS = {".pdf", ".docx"}
+PIPELINE_STATUSES = {"uploaded", "parsing", "parsed", "embedding", "processed", "failed"}
 
 
 def _validate_file(file: UploadFile, file_bytes: bytes) -> None:
@@ -56,6 +57,19 @@ def _validate_file(file: UploadFile, file_bytes: bytes) -> None:
             status_code=status.HTTP_415_UNSUPPORTED_MEDIA_TYPE,
             detail=f"Unsupported content type: {file.content_type}.",
         )
+
+
+def _processing_status_value(raw_status: str | None) -> str:
+    normalized = (raw_status or "").strip().lower()
+    if normalized in PIPELINE_STATUSES:
+        return normalized
+
+    # Ranking reuses the top-level status field on candidates; once that happens,
+    # the upload-progress API should still report the NLP pipeline as complete.
+    if normalized in {"shortlist", "manual_review", "reject"}:
+        return "processed"
+
+    return "uploaded"
 
 
 @router.post("/resume", response_model=UploadResumeResponse, status_code=status.HTTP_201_CREATED)
@@ -184,7 +198,7 @@ async def get_resume_status(candidate_id: str) -> ProcessingStatusResponse:
 
     return ProcessingStatusResponse(
         documentId=candidate_id,
-        status=candidate.get("status", "uploaded"),
+        status=_processing_status_value(candidate.get("status")),
         processingError=candidate.get("processingError"),
     )
 
@@ -200,6 +214,6 @@ async def get_jd_status(job_id: str) -> ProcessingStatusResponse:
 
     return ProcessingStatusResponse(
         documentId=job_id,
-        status=job.get("status", "uploaded"),
+        status=_processing_status_value(job.get("status")),
         processingError=job.get("processingError"),
     )
