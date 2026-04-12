@@ -11,7 +11,7 @@ from google.api_core.client_options import ClientOptions
 from google.cloud import documentai
 from server.config import settings
 from server.models.schemas import DocumentSection, EmbeddingRecord, ParsedDocument
-from server.services import firestore_db, storage
+from server.services import firestore_db, ranking_engine, storage
 from vertexai.language_models import TextEmbeddingModel
 
 logger = logging.getLogger(__name__)
@@ -76,6 +76,7 @@ def process_upload_event(event: UploadEvent) -> None:
             payload=embedding.model_dump(),
         )
         _mark_status(event, "processed")
+        _trigger_ranking(event)
     except Exception as exc:
         logger.exception("NLP pipeline failed for %s %s", event.kind, event.document_id)
         _mark_status(event, "failed", error=str(exc))
@@ -253,3 +254,25 @@ def _embedding_text(parsed: ParsedDocument) -> str:
         return "\n\n".join(prioritized_chunks)
 
     return parsed.extractedText
+
+
+def _trigger_ranking(event: UploadEvent) -> None:
+    """
+    Kick ranking after NLP completes.
+
+    - When a JD finishes, rerank that job against all processed candidates.
+    - When a resume finishes, rerank all jobs so the new candidate can appear in results.
+    """
+    if event.kind == "jd_uploaded":
+        ranked_count = ranking_engine.run_ranking(job_id=event.document_id)
+        logger.info("Triggered ranking for job %s. Candidates ranked=%s", event.document_id, ranked_count)
+        return
+
+    for job_id in firestore_db.list_job_ids():
+        ranked_count = ranking_engine.run_ranking(job_id=job_id)
+        logger.info(
+            "Triggered ranking after candidate %s for job %s. Candidates ranked=%s",
+            event.document_id,
+            job_id,
+            ranked_count,
+        )

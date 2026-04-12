@@ -82,3 +82,15 @@ export interface ExplainabilityResponse {
   fairness_note: string;
   source: string;
 }
+
+export interface ExplainabilityRankingData {
+  candidate_id: string;
+  candidate_name: string;
+  job_title?: string;
+  overall_score: number;
+  matched_skills: string[];
+  missing_skills: string[];
+  score_breakdown?: Record<string, number>;
+  years_experience?: number;
+  jd_summary?: string;
+}

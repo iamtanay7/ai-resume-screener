@@ -130,6 +130,13 @@ def get_results_for_job(job_id: str) -> list[dict[str, Any]]:
     return [doc.to_dict() for doc in docs]
 
 
+def list_job_ids() -> list[str]:
+    """Return all known job ids."""
+    db = _get_client()
+    docs = db.collection(COLLECTION_JOBS).stream()
+    return [str((doc.to_dict() or {}).get("id", doc.id)) for doc in docs if doc.exists]
+
+
 def get_job_processed_artifact(job_id: str) -> dict[str, Any] | None:
     """Read Tanay-processed job artifact from jobs document."""
     db = _get_client()

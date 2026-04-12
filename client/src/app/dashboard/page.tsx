@@ -1,14 +1,9 @@
 "use client";
 
-import { useEffect, useState } from "react";
-import { generateExplanation } from "@/lib/api";
-import type { CandidateStatus, ExplainabilityResponse } from "@/lib/types";
-
-const CANDIDATES = [
-  { candidate_id: "CAND-001", candidate_name: "Aarav Mehta", job_title: "Machine Learning Engineer" },
-  { candidate_id: "CAND-002", candidate_name: "Tanay Shirodkar", job_title: "Machine Learning Engineer" },
-  { candidate_id: "CAND-003", candidate_name: "Rohan Singh", job_title: "Machine Learning Engineer" },
-];
+import { Suspense, useEffect, useMemo, useState } from "react";
+import { useSearchParams } from "next/navigation";
+import { generateExplanationFromRanking, getResults } from "@/lib/api";
+import type { Candidate, CandidateStatus, ExplainabilityResponse } from "@/lib/types";
 
 const DECISION_LABELS: Record<CandidateStatus, string> = {
   shortlist: "Shortlist",
@@ -22,18 +17,88 @@ const DECISION_CLASSES: Record<CandidateStatus, string> = {
   reject: "bg-danger-100 text-danger-800 border-danger-200",
 };
 
-export default function DashboardPage() {
-  const [selectedCandidateId, setSelectedCandidateId] = useState(CANDIDATES[0].candidate_id);
+function DashboardContent() {
+  const searchParams = useSearchParams();
+  const jobId = searchParams.get("jobId");
+  const initialCandidateId = searchParams.get("candidateId");
+  const jobTitle = searchParams.get("jobTitle") ?? "Applied Role";
+
+  const [candidates, setCandidates] = useState<Candidate[]>([]);
+  const [selectedCandidateId, setSelectedCandidateId] = useState<string | null>(initialCandidateId);
   const [data, setData] = useState<ExplainabilityResponse | null>(null);
-  const [loading, setLoading] = useState(false);
+  const [loadingCandidates, setLoadingCandidates] = useState(false);
+  const [loadingExplanation, setLoadingExplanation] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
+    if (!jobId) {
+      setError("Missing job ID. Open the dashboard from a real results page.");
+      setCandidates([]);
+      return;
+    }
+
     let active = true;
-    setLoading(true);
+    setLoadingCandidates(true);
     setError(null);
 
-    generateExplanation(selectedCandidateId)
+    getResults(jobId)
+      .then((results) => {
+        if (!active) return;
+        setCandidates(results);
+        if (!results.length) {
+          setSelectedCandidateId(null);
+          setError("No ranked candidates are available for this job yet.");
+          return;
+        }
+        const selected = results.some((candidate) => candidate.id === initialCandidateId)
+          ? initialCandidateId
+          : results[0].id;
+        setSelectedCandidateId(selected);
+      })
+      .catch((err: unknown) => {
+        if (!active) return;
+        setError(err instanceof Error ? err.message : "Could not load ranked candidates.");
+        setCandidates([]);
+      })
+      .finally(() => {
+        if (active) setLoadingCandidates(false);
+      });
+
+    return () => {
+      active = false;
+    };
+  }, [initialCandidateId, jobId]);
+
+  const selectedCandidate = useMemo(
+    () => candidates.find((candidate) => candidate.id === selectedCandidateId) ?? null,
+    [candidates, selectedCandidateId],
+  );
+
+  useEffect(() => {
+    if (!selectedCandidate) {
+      setData(null);
+      return;
+    }
+
+    let active = true;
+    setLoadingExplanation(true);
+    setError(null);
+
+    generateExplanationFromRanking({
+      candidate_id: selectedCandidate.id,
+      candidate_name: selectedCandidate.name,
+      job_title: jobTitle,
+      overall_score: selectedCandidate.scoreBreakdown.overall,
+      matched_skills: selectedCandidate.matchedSkills,
+      missing_skills: selectedCandidate.missingSkills,
+      score_breakdown: {
+        skills_match: selectedCandidate.scoreBreakdown.skills,
+        experience_relevance: selectedCandidate.scoreBreakdown.experience,
+        education_fit: selectedCandidate.scoreBreakdown.education,
+        semantic_similarity: selectedCandidate.scoreBreakdown.keywords,
+      },
+      jd_summary: `Real ranked candidate from job ${jobId}.`,
+    })
       .then((response) => {
         if (active) setData(response);
       })
@@ -43,51 +108,55 @@ export default function DashboardPage() {
         setData(null);
       })
       .finally(() => {
-        if (active) setLoading(false);
+        if (active) setLoadingExplanation(false);
       });
 
     return () => {
       active = false;
     };
-  }, [selectedCandidateId]);
+  }, [jobId, jobTitle, selectedCandidate]);
 
   return (
     <div className="page-container grid gap-6 lg:grid-cols-[280px_1fr]">
       <aside className="rounded-xl border border-neutral-200 bg-white p-4 shadow-sm">
         <p className="text-xs uppercase tracking-wider text-neutral-500">Explainability</p>
         <h1 className="mt-1 text-xl font-bold text-neutral-900">Recruiter Dashboard</h1>
-        <p className="mt-2 text-sm text-neutral-500">Inspect rationale and decision signals per candidate.</p>
+        <p className="mt-2 text-sm text-neutral-500">Inspect rationale and decision signals per ranked candidate.</p>
 
         <div className="mt-4 space-y-2">
-          {CANDIDATES.map((candidate) => (
+          {candidates.map((candidate) => (
             <button
-              key={candidate.candidate_id}
+              key={candidate.id}
               type="button"
-              onClick={() => setSelectedCandidateId(candidate.candidate_id)}
+              onClick={() => setSelectedCandidateId(candidate.id)}
               className={[
                 "w-full rounded-lg border px-3 py-2 text-left transition-colors",
-                selectedCandidateId === candidate.candidate_id
+                selectedCandidateId === candidate.id
                   ? "border-primary-500 bg-primary-50"
                   : "border-neutral-200 bg-white hover:border-primary-300",
               ].join(" ")}
             >
-              <p className="text-sm font-medium text-neutral-800">{candidate.candidate_name}</p>
-              <p className="text-xs text-neutral-500">{candidate.job_title}</p>
+              <p className="text-sm font-medium text-neutral-800">{candidate.name}</p>
+              <p className="text-xs text-neutral-500">{jobTitle}</p>
             </button>
           ))}
+
+          {!loadingCandidates && !candidates.length && (
+            <p className="text-sm text-neutral-500">No real ranked candidates available yet.</p>
+          )}
         </div>
       </aside>
 
       <main className="space-y-4">
-        {loading && (
+        {(loadingCandidates || loadingExplanation) && (
           <div className="rounded-xl border border-neutral-200 bg-white p-6 shadow-sm">Loading dashboard data...</div>
         )}
 
-        {error && !loading && (
+        {error && !loadingCandidates && !loadingExplanation && (
           <div className="rounded-xl border border-danger-200 bg-danger-50 p-4 text-danger-700">{error}</div>
         )}
 
-        {!loading && data && (
+        {!loadingCandidates && !loadingExplanation && data && (
           <>
             <section className="rounded-xl border border-neutral-200 bg-white p-6 shadow-sm">
               <div className="flex flex-wrap items-start justify-between gap-3">
@@ -155,6 +224,14 @@ export default function DashboardPage() {
         )}
       </main>
     </div>
+  );
+}
+
+export default function DashboardPage() {
+  return (
+    <Suspense fallback={<div className="page-container">Loading dashboard...</div>}>
+      <DashboardContent />
+    </Suspense>
   );
 }
 

@@ -120,6 +120,7 @@ function ResultsContent() {
               key={candidate.id}
               candidate={candidate}
               onApproveEmail={approveEmail}
+              dashboardHref={jobId ? `/dashboard?jobId=${jobId}&candidateId=${candidate.id}` : undefined}
             />
           ))}
         </div>

@@ -1,6 +1,7 @@
 import type {
   ProcessingStatusResponse,
   Candidate,
+  ExplainabilityRankingData,
   ExplainabilityResponse,
   UploadJDResponse,
   UploadResumeResponse,
@@ -95,6 +96,21 @@ export async function generateExplanation(
     body: JSON.stringify({
       mode: "candidate_id",
       candidate_id: candidateId,
+    }),
+  });
+  return handleResponse<ExplainabilityResponse>(res);
+}
+
+export async function generateExplanationFromRanking(
+  rankingData: ExplainabilityRankingData
+): Promise<ExplainabilityResponse> {
+  const res = await fetch(`${BASE_URL}/explainability/generate`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({
+      mode: "ranking_data",
+      candidate_id: rankingData.candidate_id,
+      ranking_data: rankingData,
     }),
   });
   return handleResponse<ExplainabilityResponse>(res);

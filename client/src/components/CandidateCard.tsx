@@ -1,5 +1,6 @@
 "use client";
 
+import Link from "next/link";
 import { useState } from "react";
 import type { Candidate } from "@/lib/types";
 import { Card } from "@/components/ui/Card";
@@ -10,9 +11,10 @@ import { ScoreBreakdown } from "@/components/ScoreBreakdown";
 interface CandidateCardProps {
   candidate: Candidate;
   onApproveEmail: (candidateId: string) => Promise<void>;
+  dashboardHref?: string;
 }
 
-export function CandidateCard({ candidate, onApproveEmail }: CandidateCardProps) {
+export function CandidateCard({ candidate, onApproveEmail, dashboardHref }: CandidateCardProps) {
   const [expanded, setExpanded] = useState(false);
   const [approving, setApproving] = useState(false);
   const [approved, setApproved] = useState(false);
@@ -111,8 +113,15 @@ export function CandidateCard({ candidate, onApproveEmail }: CandidateCardProps)
           )}
 
           {/* Approve email CTA */}
-          {candidate.status !== "reject" && (
-            <div className="flex justify-end">
+          {(candidate.status !== "reject" || dashboardHref) && (
+            <div className="flex justify-end gap-2">
+              {dashboardHref && (
+                <Link href={dashboardHref}>
+                  <Button variant="secondary" size="sm">
+                    View Dashboard
+                  </Button>
+                </Link>
+              )}
               <Button
                 variant={approved ? "secondary" : "primary"}
                 size="sm"
