@@ -197,3 +197,48 @@ def test_get_results_endpoint_allows_missing_explanation(monkeypatch):
     payload = response.json()
     assert payload[0]["id"] == "c1"
     assert payload[0]["explanation"] is None
+
+
+def test_get_results_endpoint_triggers_on_demand_ranking_when_results_missing(monkeypatch):
+    calls: list[str] = []
+
+    def fake_get_results_for_job(job_id: str):
+        calls.append(job_id)
+        if len(calls) == 1:
+            return []
+        return [
+            {
+                "id": "c1",
+                "name": "Alice",
+                "email": "alice@example.com",
+                "resumeUrl": "gs://bucket/resume.pdf",
+                "scoreBreakdown": {
+                    "skills": 90,
+                    "experience": 80,
+                    "education": 85,
+                    "keywords": 70,
+                    "overall": 83,
+                },
+                "status": "shortlist",
+                "explanation": None,
+                "missingSkills": ["spark"],
+                "matchedSkills": ["python"],
+                "rank": 1,
+            }
+        ]
+
+    ranking_calls: list[str] = []
+
+    def fake_run_ranking(job_id: str, candidate_ids=None):
+        ranking_calls.append(job_id)
+        return 1
+
+    monkeypatch.setattr("server.services.firestore_db.get_results_for_job", fake_get_results_for_job)
+    monkeypatch.setattr("server.services.ranking_engine.run_ranking", fake_run_ranking)
+    client = TestClient(app)
+
+    response = client.get("/results/job-123")
+
+    assert response.status_code == 200
+    assert ranking_calls == ["job-123"]
+    assert calls == ["job-123", "job-123"]

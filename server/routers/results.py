@@ -9,7 +9,7 @@ import logging
 from fastapi import APIRouter, HTTPException, status
 
 from server.models.schemas import RankedCandidate
-from server.services import firestore_db
+from server.services import firestore_db, ranking_engine
 
 logger = logging.getLogger(__name__)
 router = APIRouter(prefix="/results", tags=["results"])
@@ -29,6 +29,19 @@ async def get_results(job_id: str) -> list[RankedCandidate]:
             status_code=status.HTTP_502_BAD_GATEWAY,
             detail="Could not fetch results. Try again shortly.",
         ) from exc
+
+    if not docs:
+        try:
+            ranked_count = ranking_engine.run_ranking(job_id=job_id)
+        except Exception as exc:
+            logger.exception("On-demand ranking failed for job %s: %s", job_id, exc)
+            raise HTTPException(
+                status_code=status.HTTP_502_BAD_GATEWAY,
+                detail="Could not generate results. Try again shortly.",
+            ) from exc
+
+        if ranked_count > 0:
+            docs = firestore_db.get_results_for_job(job_id)
 
     if not docs:
         raise HTTPException(
