@@ -13,6 +13,7 @@ from fastapi import APIRouter, Form, HTTPException, UploadFile, status
 
 from server.config import settings
 from server.models.schemas import (
+    JobListItem,
     ProcessingStatusResponse,
     UploadJDResponse,
     UploadResumeResponse,
@@ -217,3 +218,8 @@ async def get_jd_status(job_id: str) -> ProcessingStatusResponse:
         status=_processing_status_value(job.get("status")),
         processingError=job.get("processingError"),
     )
+
+
+@router.get("/jds", response_model=list[JobListItem])
+async def list_uploaded_jds() -> list[JobListItem]:
+    return [JobListItem(**job) for job in firestore_db.list_jobs()]

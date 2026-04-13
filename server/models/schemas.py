@@ -89,6 +89,15 @@ class ProcessingStatusResponse(BaseModel):
     processingError: str | None = None
 
 
+class JobListItem(BaseModel):
+    id: str
+    title: str
+    fileUrl: str
+    uploadedAt: datetime | str
+    status: str
+    processingError: str | None = None
+
+
 # ── Results (written by Michael's ranking engine, read here) ──────────────────
 
 CandidateStatus = Literal["shortlist", "manual_review", "reject"]

@@ -137,6 +137,30 @@ def list_job_ids() -> list[str]:
     return [str((doc.to_dict() or {}).get("id", doc.id)) for doc in docs if doc.exists]
 
 
+def list_jobs() -> list[dict[str, Any]]:
+    """Return job documents ordered newest-first for recruiter views."""
+    db = _get_client()
+    docs = db.collection(COLLECTION_JOBS).stream()
+    jobs: list[dict[str, Any]] = []
+    for doc in docs:
+        if not doc.exists:
+            continue
+        payload = doc.to_dict() or {}
+        jobs.append(
+            {
+                "id": payload.get("id", doc.id),
+                "title": payload.get("title", ""),
+                "fileUrl": payload.get("fileUrl", ""),
+                "uploadedAt": payload.get("uploadedAt", ""),
+                "status": payload.get("status", "uploaded"),
+                "processingError": payload.get("processingError"),
+            }
+        )
+
+    jobs.sort(key=lambda job: str(job.get("uploadedAt", "")), reverse=True)
+    return jobs
+
+
 def get_job_processed_artifact(job_id: str) -> dict[str, Any] | None:
     """Read Tanay-processed job artifact from jobs document."""
     db = _get_client()
