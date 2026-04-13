@@ -220,9 +220,9 @@ function RecruiterPageContent() {
 
           <FileUpload
             label="Job Description File"
-            accept=".pdf,.docx"
+            accept=".pdf"
             onFile={setFile}
-            hint="PDF or DOCX — max 10 MB"
+            hint="PDF only — max 10 MB"
           />
 
           {error && (
