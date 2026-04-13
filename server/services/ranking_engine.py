@@ -198,10 +198,14 @@ def run_ranking(job_id: str, candidate_ids: list[str] | None = None) -> int:
     candidates = firestore_db.get_candidate_processed_artifacts(candidate_ids)
     if not candidates:
         return 0
+    candidate_lookup = {str(candidate.get("id", "")): candidate for candidate in candidates}
 
     scored: list[ScoredCandidate] = []
     for candidate in candidates:
         candidate_id = str(candidate.get("id", ""))
+        candidate_name = str(candidate.get("name", "")).strip()
+        candidate_email = str(candidate.get("email", "")).strip()
+        resume_url = str(candidate.get("resumeUrl", "")).strip()
         candidate_has_artifact_content = bool(candidate.get("skills") or candidate.get("embedding") or candidate.get("keywords"))
         if not candidate_id or not _is_processed(candidate.get("processingStatus"), candidate_has_artifact_content):
             continue
@@ -216,9 +220,13 @@ def run_ranking(job_id: str, candidate_ids: list[str] | None = None) -> int:
     )
 
     for idx, result in enumerate(scored, start=1):
+        candidate = candidate_lookup.get(result.candidate_id, {})
         firestore_db.persist_candidate_ranking(
             candidate_id=result.candidate_id,
             job_id=job_id,
+            name=str(candidate.get("name", "")).strip(),
+            email=str(candidate.get("email", "")).strip(),
+            resume_url=str(candidate.get("resumeUrl", "")).strip(),
             rank=idx,
             score_breakdown=result.score_breakdown,
             status=result.status,

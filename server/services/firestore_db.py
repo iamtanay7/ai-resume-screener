@@ -11,6 +11,7 @@ _client: firestore.Client | None = None
 
 COLLECTION_CANDIDATES = "candidates"
 COLLECTION_JOBS = "jobs"
+COLLECTION_JOB_RESULTS = "jobResults"
 SUBCOLLECTION_NLP = "nlpArtifacts"
 
 
@@ -64,8 +65,10 @@ def _select_nlp_artifact(payload: dict[str, Any], subcollection_artifacts: dict[
     if isinstance(inline_status, dict):
         inline_status = inline_status.get("value")
 
+    skills = parsed.get("skills", []) or _extract_skills_from_sections(parsed)
+
     return {
-        "skills": parsed.get("skills", []),
+        "skills": skills,
         "requiredYearsExperience": parsed.get("requiredYearsExperience", parsed.get("yearsExperience", 0)),
         "yearsExperience": parsed.get("yearsExperience", 0),
         "educationLevel": parsed.get("educationLevel", ""),
@@ -74,6 +77,48 @@ def _select_nlp_artifact(payload: dict[str, Any], subcollection_artifacts: dict[
         "embedding": embedding_doc.get("vector") or parsed.get("embedding") or [],
         "processingStatus": status_doc.get("value") or inline_status or payload.get("status") or "",
     }
+
+
+def _extract_skills_from_sections(parsed: dict[str, Any]) -> list[str]:
+    """Best-effort skills extraction from ParsedDocument sections."""
+    sections = parsed.get("sections") or []
+    if not isinstance(sections, list):
+        return []
+
+    skill_blocks: list[str] = []
+    for section in sections:
+        if not isinstance(section, dict):
+            continue
+        title = str(section.get("title", "")).strip().lower()
+        if any(token in title for token in ("skill", "technology", "competenc")):
+            content = str(section.get("content", "")).strip()
+            if content:
+                skill_blocks.append(content)
+
+    if not skill_blocks:
+        return []
+
+    raw = "\n".join(skill_blocks)
+    # Split on common delimiters and bullets.
+    parts: list[str] = []
+    for chunk in raw.replace("•", "\n").replace("·", "\n").replace("|", "\n").splitlines():
+        for piece in chunk.split(","):
+            for atom in piece.split(";"):
+                candidate = atom.strip()
+                if candidate:
+                    parts.append(candidate)
+
+    # Normalize and de-duplicate while preserving order.
+    seen: set[str] = set()
+    skills: list[str] = []
+    for part in parts:
+        key = part.lower()
+        if key in seen:
+            continue
+        seen.add(key)
+        skills.append(part)
+
+    return skills
 
 
 def _get_client() -> firestore.Client:
@@ -122,8 +167,9 @@ def get_results_for_job(job_id: str) -> list[dict[str, Any]]:
     """
     db = _get_client()
     query = (
-        db.collection(COLLECTION_CANDIDATES)
-        .where("jobId", "==", job_id)
+        db.collection(COLLECTION_JOB_RESULTS)
+        .document(job_id)
+        .collection("candidates")
         .order_by("rank")
     )
     docs = query.stream()
@@ -195,6 +241,9 @@ def get_candidate_processed_artifacts(candidate_ids: list[str] | None = None) ->
         results.append(
             {
                 "id": payload.get("id", doc.id),
+                "name": payload.get("name", ""),
+                "email": payload.get("email", ""),
+                "resumeUrl": payload.get("resumeUrl", ""),
                 "skills": processed["skills"],
                 "yearsExperience": processed["yearsExperience"],
                 "educationLevel": processed["educationLevel"],
@@ -210,6 +259,9 @@ def get_candidate_processed_artifacts(candidate_ids: list[str] | None = None) ->
 def persist_candidate_ranking(
     candidate_id: str,
     job_id: str,
+    name: str,
+    email: str,
+    resume_url: str,
     rank: int,
     score_breakdown: dict[str, Any],
     status: str,
@@ -218,11 +270,20 @@ def persist_candidate_ranking(
     hard_filters: dict[str, Any],
     ranking_version: str,
 ) -> None:
-    """Persist ranking metadata on candidate document for recruiter results retrieval."""
+    """Persist ranking metadata under jobResults for recruiter results retrieval."""
     db = _get_client()
-    doc_ref = db.collection(COLLECTION_CANDIDATES).document(candidate_id)
-    doc_ref.update(
+    doc_ref = (
+        db.collection(COLLECTION_JOB_RESULTS)
+        .document(job_id)
+        .collection("candidates")
+        .document(candidate_id)
+    )
+    doc_ref.set(
         {
+            "id": candidate_id,
+            "name": name,
+            "email": email,
+            "resumeUrl": resume_url,
             "jobId": job_id,
             "rank": rank,
             "scoreBreakdown": score_breakdown,
