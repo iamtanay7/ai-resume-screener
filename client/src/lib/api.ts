@@ -3,11 +3,16 @@ import type {
   Candidate,
   ExplainabilityRankingData,
   ExplainabilityResponse,
+  JobDescription,
   UploadJDResponse,
   UploadResumeResponse,
 } from "./types";
 
-const BASE_URL = process.env.NEXT_PUBLIC_API_URL ?? "http://localhost:8000";
+const BASE_URL =
+  process.env.NEXT_PUBLIC_API_URL ||
+  (process.env.NODE_ENV === "development"
+    ? "http://localhost:8000"
+    : "https://resume-api-253408457990.us-central1.run.app");
 
 async function handleResponse<T>(res: Response): Promise<T> {
   if (!res.ok) {
@@ -85,6 +90,14 @@ export async function getJDStatus(
     headers: { "Content-Type": "application/json" },
   });
   return handleResponse<ProcessingStatusResponse>(res);
+}
+
+export async function getUploadedJDs(): Promise<JobDescription[]> {
+  const res = await fetch(`${BASE_URL}/upload/jds`, {
+    method: "GET",
+    headers: { "Content-Type": "application/json" },
+  });
+  return handleResponse<JobDescription[]>(res);
 }
 
 export async function generateExplanation(

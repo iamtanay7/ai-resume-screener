@@ -1,11 +1,17 @@
 "use client";
 
-import { useEffect, useRef, useState } from "react";
+import { Suspense, useEffect, useRef, useState } from "react";
+import { useRouter, useSearchParams } from "next/navigation";
 import { FileUpload } from "@/components/ui/FileUpload";
 import { Button } from "@/components/ui/Button";
 import { Card } from "@/components/ui/Card";
 import { PipelineStatus } from "@/components/PipelineStatus";
 import { getResumeStatus, uploadResume } from "@/lib/api";
+import {
+  clearCandidateUploadState,
+  readCandidateUploadState,
+  saveCandidateUploadState,
+} from "@/lib/persistence";
 import type { BackendProcessingStatus, PipelineStage } from "@/lib/types";
 
 const INITIAL_STAGES: PipelineStage[] = [
@@ -15,7 +21,9 @@ const INITIAL_STAGES: PipelineStage[] = [
   { label: "Queue",   status: "pending" },
 ];
 
-export default function CandidatePage() {
+function CandidatePageContent() {
+  const router = useRouter();
+  const searchParams = useSearchParams();
   const [file, setFile]       = useState<File | null>(null);
   const [email, setEmail]     = useState("");
   const [name, setName]       = useState("");
@@ -25,6 +33,27 @@ export default function CandidatePage() {
   const [stages, setStages]   = useState<PipelineStage[]>(INITIAL_STAGES);
   const [candidateId, setCandidateId] = useState<string | null>(null);
   const pollRef = useRef<number | null>(null);
+
+  useEffect(() => {
+    const candidateIdFromUrl = searchParams.get("candidateId");
+    const persisted = readCandidateUploadState();
+
+    if (candidateIdFromUrl) {
+      setCandidateId(candidateIdFromUrl);
+      if (persisted?.candidateId === candidateIdFromUrl) {
+        setName(persisted.name);
+        setEmail(persisted.email);
+      }
+      return;
+    }
+
+    if (persisted) {
+      setCandidateId(persisted.candidateId);
+      setName(persisted.name);
+      setEmail(persisted.email);
+      router.replace(`/candidate?candidateId=${persisted.candidateId}`);
+    }
+  }, [router, searchParams]);
 
   function updateStage(idx: number, status: PipelineStage["status"]) {
     setStages((prev) =>
@@ -53,6 +82,11 @@ export default function CandidatePage() {
 
         if (status.status === "processed") {
           setDone(true);
+          saveCandidateUploadState({
+            candidateId: currentCandidateId,
+            name,
+            email,
+          });
           setLoading(false);
           return;
         }
@@ -87,6 +121,12 @@ export default function CandidatePage() {
       const { candidateId } = await uploadResume(file, email.trim(), name.trim());
       updateStage(0, "done");
       setCandidateId(candidateId);
+      saveCandidateUploadState({
+        candidateId,
+        name: name.trim(),
+        email: email.trim(),
+      });
+      router.replace(`/candidate?candidateId=${candidateId}`);
     } catch (err) {
       setError(err instanceof Error ? err.message : "Upload failed");
       setStages((prev) =>
@@ -123,6 +163,8 @@ export default function CandidatePage() {
               setName("");
               setCandidateId(null);
               setError(null);
+              clearCandidateUploadState();
+              router.replace("/candidate");
             }}
           >
             Submit Another Resume
@@ -189,7 +231,17 @@ export default function CandidatePage() {
       </Card>
 
       {loading && <PipelineStatus stages={stages} />}
+
+      {candidateId && !loading && <PipelineStatus stages={stages} />}
     </div>
+  );
+}
+
+export default function CandidatePage() {
+  return (
+    <Suspense fallback={<div className="page-container max-w-2xl" />}>
+      <CandidatePageContent />
+    </Suspense>
   );
 }
 

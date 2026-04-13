@@ -1,13 +1,20 @@
 "use client";
 
-import { useEffect, useRef, useState } from "react";
-import { useRouter } from "next/navigation";
+import { Suspense, useEffect, useRef, useState } from "react";
+import { useRouter, useSearchParams } from "next/navigation";
 import { FileUpload } from "@/components/ui/FileUpload";
 import { Button } from "@/components/ui/Button";
 import { Card } from "@/components/ui/Card";
 import { PipelineStatus } from "@/components/PipelineStatus";
-import { getJDStatus, uploadJD } from "@/lib/api";
-import type { BackendProcessingStatus, PipelineStage } from "@/lib/types";
+import { getJDStatus, getUploadedJDs, uploadJD } from "@/lib/api";
+import {
+  clearRecruiterUploadState,
+  rememberRecruiterJob,
+  readRecruiterJobHistory,
+  readRecruiterUploadState,
+  saveRecruiterUploadState,
+} from "@/lib/persistence";
+import type { BackendProcessingStatus, JobDescription, PipelineStage } from "@/lib/types";
 
 const INITIAL_STAGES: PipelineStage[] = [
   { label: "Upload",    status: "pending" },
@@ -16,15 +23,66 @@ const INITIAL_STAGES: PipelineStage[] = [
   { label: "Index",     status: "pending" },
 ];
 
-export default function RecruiterPage() {
+function RecruiterPageContent() {
   const router = useRouter();
+  const searchParams = useSearchParams();
   const [file, setFile]       = useState<File | null>(null);
   const [jobTitle, setJobTitle] = useState("");
   const [loading, setLoading] = useState(false);
   const [error, setError]     = useState<string | null>(null);
   const [jobId, setJobId]     = useState<string | null>(null);
   const [stages, setStages]   = useState<PipelineStage[]>(INITIAL_STAGES);
+  const [jobs, setJobs]       = useState<JobDescription[]>([]);
+  const [jobsLoading, setJobsLoading] = useState(true);
   const pollRef = useRef<number | null>(null);
+
+  useEffect(() => {
+    const jobIdFromUrl = searchParams.get("jobId");
+    const persisted = readRecruiterUploadState();
+
+    if (jobIdFromUrl) {
+      setJobId(jobIdFromUrl);
+      if (persisted?.jobId === jobIdFromUrl) {
+        setJobTitle(persisted.jobTitle);
+      }
+      return;
+    }
+
+    if (persisted) {
+      setJobId(persisted.jobId);
+      setJobTitle(persisted.jobTitle);
+      router.replace(`/recruiter?jobId=${persisted.jobId}`);
+    }
+  }, [router, searchParams]);
+
+  useEffect(() => {
+    let cancelled = false;
+
+    async function loadJobs() {
+      setJobsLoading(true);
+      try {
+        const backendJobs = await getUploadedJDs();
+        if (cancelled) return;
+        const history = readRecruiterJobHistory();
+        const historyTitles = new Map(history.map((item) => [item.jobId, item.jobTitle]));
+        setJobs(
+          backendJobs.map((job) => ({
+            ...job,
+            title: job.title || historyTitles.get(job.id) || "Untitled role",
+          }))
+        );
+      } catch {
+        if (cancelled) return;
+      } finally {
+        if (!cancelled) setJobsLoading(false);
+      }
+    }
+
+    loadJobs();
+    return () => {
+      cancelled = true;
+    };
+  }, [jobId]);
 
   function updateStage(idx: number, status: PipelineStage["status"]) {
     setStages((prev) =>
@@ -53,8 +111,25 @@ export default function RecruiterPage() {
 
         if (status.status === "processed") {
           setLoading(false);
+          saveRecruiterUploadState({
+            jobId: currentJobId,
+            jobTitle,
+          });
+          setJobs((prev) =>
+            prev.map((job) =>
+              job.id === currentJobId ? { ...job, status: "processed", processingError: null } : job
+            )
+          );
           return;
         }
+
+        setJobs((prev) =>
+          prev.map((job) =>
+            job.id === currentJobId
+              ? { ...job, status: status.status, processingError: status.processingError }
+              : job
+          )
+        );
 
         pollRef.current = window.setTimeout(poll, 1500);
       } catch (err) {
@@ -86,6 +161,27 @@ export default function RecruiterPage() {
       const { jobId: id } = await uploadJD(file, jobTitle.trim());
       updateStage(0, "done");
       setJobId(id);
+      saveRecruiterUploadState({
+        jobId: id,
+        jobTitle: jobTitle.trim(),
+      });
+      rememberRecruiterJob({
+        jobId: id,
+        jobTitle: jobTitle.trim(),
+      });
+      setJobs((prev) => [
+        {
+          id,
+          title: jobTitle.trim(),
+          fileUrl: "",
+          uploadedAt: new Date().toISOString(),
+          status: "uploaded",
+          processingError: null,
+        },
+        ...prev.filter((job) => job.id !== id),
+      ]);
+      setFile(null);
+      router.replace(`/recruiter?jobId=${id}`);
     } catch (err) {
       setError(err instanceof Error ? err.message : "Upload failed");
       setStages((prev) =>
@@ -94,23 +190,6 @@ export default function RecruiterPage() {
     } finally {
       setLoading(false);
     }
-  }
-
-  if (jobId) {
-    return (
-      <div className="page-container max-w-2xl space-y-6">
-        <SuccessBanner title="Job Description uploaded!" />
-        <PipelineStatus stages={stages} />
-        <div className="flex justify-end gap-3">
-          <Button variant="secondary" onClick={() => { setJobId(null); setStages(INITIAL_STAGES); setFile(null); setJobTitle(""); setError(null); }}>
-            Upload Another
-          </Button>
-          <Button onClick={() => router.push(`/results?jobId=${jobId}`)}>
-            View Results →
-          </Button>
-        </div>
-      </div>
-    );
   }
 
   return (
@@ -164,10 +243,101 @@ export default function RecruiterPage() {
         </form>
       </Card>
 
-      {loading && (
+      {jobId && (
+        <div className="space-y-4">
+          <SuccessBanner title="Latest job description uploaded" />
+          <PipelineStatus stages={stages} />
+          <div className="flex justify-end gap-3">
+            <Button
+              variant="secondary"
+              onClick={() => {
+                setJobId(null);
+                setStages(INITIAL_STAGES);
+                setJobTitle("");
+                setError(null);
+                clearRecruiterUploadState();
+                router.replace("/recruiter");
+              }}
+            >
+              Clear Current View
+            </Button>
+            <Button onClick={() => router.push(`/results?jobId=${jobId}`)}>
+              View Latest Results →
+            </Button>
+          </div>
+        </div>
+      )}
+
+      {(loading || jobId) && (
         <PipelineStatus stages={stages} />
       )}
+
+      <Card className="space-y-4">
+        <div className="flex items-center justify-between gap-4">
+          <div>
+            <h2 className="text-lg font-semibold text-neutral-800">Uploaded Job Descriptions</h2>
+            <p className="text-sm text-neutral-500">
+              Recruiters can manage multiple roles and open rankings for each one separately.
+            </p>
+          </div>
+        </div>
+
+        {jobsLoading ? (
+          <p className="text-sm text-neutral-500">Loading uploaded roles...</p>
+        ) : jobs.length === 0 ? (
+          <p className="text-sm text-neutral-500">No job descriptions uploaded yet.</p>
+        ) : (
+          <div className="space-y-3">
+            {jobs.map((job) => (
+              <div
+                key={job.id}
+                className="rounded-xl border border-neutral-200 bg-white px-4 py-3 shadow-sm"
+              >
+                <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+                  <div className="space-y-1">
+                    <p className="font-medium text-neutral-800">{job.title}</p>
+                    <p className="text-xs text-neutral-500">Job ID: {job.id}</p>
+                    <p className="text-xs text-neutral-500">
+                      Uploaded: {new Date(job.uploadedAt).toLocaleString()}
+                    </p>
+                    <p className="text-sm text-neutral-600">
+                      Status: <span className="font-medium">{humanizeStatus(job.status)}</span>
+                    </p>
+                    {job.processingError && (
+                      <p className="text-sm text-danger-700">{job.processingError}</p>
+                    )}
+                  </div>
+                  <div className="flex gap-2">
+                    <Button
+                      variant="secondary"
+                      onClick={() => {
+                        setJobId(job.id);
+                        setJobTitle(job.title);
+                        saveRecruiterUploadState({ jobId: job.id, jobTitle: job.title });
+                        router.push(`/recruiter?jobId=${job.id}`);
+                      }}
+                    >
+                      Track Status
+                    </Button>
+                    <Button onClick={() => router.push(`/results?jobId=${job.id}`)}>
+                      View Rankings
+                    </Button>
+                  </div>
+                </div>
+              </div>
+            ))}
+          </div>
+        )}
+      </Card>
     </div>
+  );
+}
+
+export default function RecruiterPage() {
+  return (
+    <Suspense fallback={<div className="page-container max-w-2xl" />}>
+      <RecruiterPageContent />
+    </Suspense>
   );
 }
 
@@ -232,4 +402,11 @@ function mapJDStages(status: BackendProcessingStatus): PipelineStage[] {
     { label: "Embed", status: "done" },
     { label: "Index", status: "done" },
   ];
+}
+
+function humanizeStatus(status: string): string {
+  return status
+    .split("_")
+    .map((part) => part.charAt(0).toUpperCase() + part.slice(1))
+    .join(" ");
 }

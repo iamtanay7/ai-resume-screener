@@ -35,6 +35,8 @@ export interface JobDescription {
   title: string;
   fileUrl: string;
   uploadedAt: string;
+  status: string;
+  processingError?: string | null;
 }
 
 export interface PipelineStage {
