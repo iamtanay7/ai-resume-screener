@@ -76,6 +76,7 @@ def _processing_status_value(raw_status: str | None) -> str:
 @router.post("/resume", response_model=UploadResumeResponse, status_code=status.HTTP_201_CREATED)
 async def upload_resume(
     file: UploadFile,
+    jobId: str = Form(...),
     email: str = Form(...),
     name: str = Form(...),
 ) -> UploadResumeResponse:
@@ -92,6 +93,16 @@ async def upload_resume(
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
             detail="Candidate name is required.",
+        )
+    if not jobId.strip():
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Job ID is required.",
+        )
+    if firestore_db.get_job(jobId.strip()) is None:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="Job ID not found. Please select a valid job.",
         )
 
     file_bytes = await file.read()
@@ -114,6 +125,7 @@ async def upload_resume(
             name=name.strip(),
             email=email.strip(),
             gcs_url=gcs_url,
+            job_id=jobId.strip(),
         )
 
         pubsub.publish_resume_uploaded(

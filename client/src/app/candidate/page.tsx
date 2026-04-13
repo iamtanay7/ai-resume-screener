@@ -6,13 +6,13 @@ import { FileUpload } from "@/components/ui/FileUpload";
 import { Button } from "@/components/ui/Button";
 import { Card } from "@/components/ui/Card";
 import { PipelineStatus } from "@/components/PipelineStatus";
-import { getResumeStatus, uploadResume } from "@/lib/api";
+import { getResumeStatus, getUploadedJDs, uploadResume } from "@/lib/api";
 import {
   clearCandidateUploadState,
   readCandidateUploadState,
   saveCandidateUploadState,
 } from "@/lib/persistence";
-import type { BackendProcessingStatus, PipelineStage } from "@/lib/types";
+import type { BackendProcessingStatus, JobDescription, PipelineStage } from "@/lib/types";
 
 const INITIAL_STAGES: PipelineStage[] = [
   { label: "Upload",  status: "pending" },
@@ -32,7 +32,11 @@ function CandidatePageContent() {
   const [done, setDone]       = useState(false);
   const [stages, setStages]   = useState<PipelineStage[]>(INITIAL_STAGES);
   const [candidateId, setCandidateId] = useState<string | null>(null);
+  const [jobs, setJobs] = useState<JobDescription[]>([]);
+  const [jobsLoading, setJobsLoading] = useState(true);
+  const [jobId, setJobId] = useState<string>("");
   const pollRef = useRef<number | null>(null);
+  const jobsAvailable = !jobsLoading && jobs.length > 0;
 
   useEffect(() => {
     const candidateIdFromUrl = searchParams.get("candidateId");
@@ -43,6 +47,7 @@ function CandidatePageContent() {
       if (persisted?.candidateId === candidateIdFromUrl) {
         setName(persisted.name);
         setEmail(persisted.email);
+        setJobId(persisted.jobId);
       }
       return;
     }
@@ -51,9 +56,31 @@ function CandidatePageContent() {
       setCandidateId(persisted.candidateId);
       setName(persisted.name);
       setEmail(persisted.email);
+      setJobId(persisted.jobId);
       router.replace(`/candidate?candidateId=${persisted.candidateId}`);
     }
   }, [router, searchParams]);
+
+  useEffect(() => {
+    let cancelled = false;
+
+    async function loadJobs() {
+      setJobsLoading(true);
+      try {
+        const data = await getUploadedJDs();
+        if (!cancelled) setJobs(data);
+      } catch {
+        if (!cancelled) setJobs([]);
+      } finally {
+        if (!cancelled) setJobsLoading(false);
+      }
+    }
+
+    loadJobs();
+    return () => {
+      cancelled = true;
+    };
+  }, []);
 
   function updateStage(idx: number, status: PipelineStage["status"]) {
     setStages((prev) =>
@@ -86,6 +113,7 @@ function CandidatePageContent() {
             candidateId: currentCandidateId,
             name,
             email,
+            jobId,
           });
           setLoading(false);
           return;
@@ -111,20 +139,21 @@ function CandidatePageContent() {
 
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
-    if (!file || !email.trim() || !name.trim()) return;
+    if (!file || !email.trim() || !name.trim() || !jobId) return;
 
     setLoading(true);
     setError(null);
 
     try {
       updateStage(0, "processing");
-      const { candidateId } = await uploadResume(file, email.trim(), name.trim());
+      const { candidateId } = await uploadResume(file, email.trim(), name.trim(), jobId);
       updateStage(0, "done");
       setCandidateId(candidateId);
       saveCandidateUploadState({
         candidateId,
         name: name.trim(),
         email: email.trim(),
+        jobId,
       });
       router.replace(`/candidate?candidateId=${candidateId}`);
     } catch (err) {
@@ -161,6 +190,7 @@ function CandidatePageContent() {
               setFile(null);
               setEmail("");
               setName("");
+              setJobId("");
               setCandidateId(null);
               setError(null);
               clearCandidateUploadState();
@@ -205,6 +235,37 @@ function CandidatePageContent() {
             required
           />
 
+          <div className="space-y-1.5">
+            <label htmlFor="jobId" className="text-sm font-medium text-neutral-700">
+              Apply To Job
+            </label>
+            <select
+              id="jobId"
+              value={jobId}
+              onChange={(e) => setJobId(e.target.value)}
+              required
+              className="w-full rounded-lg border border-neutral-300 px-3 py-2 text-sm text-neutral-800 focus:border-primary-500 focus:outline-none focus:ring-1 focus:ring-primary-500 transition-colors"
+            >
+              <option value="" disabled>
+                {jobsLoading
+                  ? "Loading jobs..."
+                  : jobsAvailable
+                    ? "Select a job"
+                    : "No jobs available"}
+              </option>
+              {jobs.map((job) => (
+                <option key={job.id} value={job.id}>
+                  {job.title || "Untitled role"}
+                </option>
+              ))}
+            </select>
+            {!jobsLoading && !jobsAvailable && (
+              <p className="text-xs text-neutral-500">
+                A recruiter needs to upload a job description before you can apply.
+              </p>
+            )}
+          </div>
+
           <FileUpload
             label="Resume"
             accept=".pdf,.docx"
@@ -221,7 +282,7 @@ function CandidatePageContent() {
           <Button
             type="submit"
             loading={loading}
-            disabled={!file || !email.trim() || !name.trim()}
+            disabled={!file || !email.trim() || !name.trim() || !jobId || !jobsAvailable}
             className="w-full"
             size="lg"
           >
