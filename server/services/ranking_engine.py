@@ -128,11 +128,17 @@ def _score_candidate(job_data: dict[str, Any], candidate_data: dict[str, Any], c
     weights = _weights()
     job_skills = _normalize_skill_set(job_data.get("skills"))
     candidate_skills = _normalize_skill_set(candidate_data.get("skills"))
+    job_keywords = _normalize_skill_set(job_data.get("keywords"))
+    candidate_keywords = _normalize_skill_set(candidate_data.get("keywords"))
 
-    matched_skills = sorted(skill for skill in candidate_skills if skill in job_skills)
-    missing_skills = sorted(skill for skill in job_skills if skill not in candidate_skills)
+    # If explicit skills are missing, fall back to keywords so matched/missing skills aren't empty.
+    skill_basis_job = job_skills or job_keywords
+    skill_basis_candidate = candidate_skills or candidate_keywords
 
-    lexical_skills_score = 100.0 if not job_skills else (len(matched_skills) / len(job_skills)) * 100.0
+    matched_skills = sorted(skill for skill in skill_basis_candidate if skill in skill_basis_job)
+    missing_skills = sorted(skill for skill in skill_basis_job if skill not in skill_basis_candidate)
+
+    lexical_skills_score = 100.0 if not skill_basis_job else (len(matched_skills) / len(skill_basis_job)) * 100.0
     semantic_skills_score = _embedding_similarity_score(job_data.get("embedding"), candidate_data.get("embedding"))
     if semantic_skills_score is None:
         skills_score = lexical_skills_score
@@ -147,8 +153,6 @@ def _score_candidate(job_data: dict[str, Any], candidate_data: dict[str, Any], c
     candidate_edu = str(candidate_data.get("educationLevel", "")).strip().lower()
     education_score = 100.0 if not job_edu else (100.0 if job_edu == candidate_edu else 60.0 if candidate_edu else 0.0)
 
-    job_keywords = _normalize_skill_set(job_data.get("keywords"))
-    candidate_keywords = _normalize_skill_set(candidate_data.get("keywords"))
     keywords_score = 100.0 if not job_keywords else (len(job_keywords.intersection(candidate_keywords)) / len(job_keywords)) * 100.0
 
     score_breakdown = {
@@ -195,7 +199,7 @@ def run_ranking(job_id: str, candidate_ids: list[str] | None = None) -> int:
     if not _is_processed(job_data.get("processingStatus"), has_artifact_content=job_has_artifact_content):
         return 0
 
-    candidates = firestore_db.get_candidate_processed_artifacts(candidate_ids)
+    candidates = firestore_db.get_candidate_processed_artifacts(candidate_ids, job_id=job_id)
     if not candidates:
         return 0
     candidate_lookup = {str(candidate.get("id", "")): candidate for candidate in candidates}
@@ -207,6 +211,8 @@ def run_ranking(job_id: str, candidate_ids: list[str] | None = None) -> int:
         candidate_email = str(candidate.get("email", "")).strip()
         resume_url = str(candidate.get("resumeUrl", "")).strip()
         candidate_has_artifact_content = bool(candidate.get("skills") or candidate.get("embedding") or candidate.get("keywords"))
+        if candidate.get("appliedJobId") and str(candidate.get("appliedJobId")) != job_id:
+            continue
         if not candidate_id or not _is_processed(candidate.get("processingStatus"), candidate_has_artifact_content):
             continue
         scored.append(_score_candidate(job_data=job_data, candidate_data=candidate, candidate_id=candidate_id))
