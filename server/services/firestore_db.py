@@ -66,13 +66,14 @@ def _select_nlp_artifact(payload: dict[str, Any], subcollection_artifacts: dict[
         inline_status = inline_status.get("value")
 
     skills = parsed.get("skills", []) or _extract_skills_from_sections(parsed)
+    keywords = parsed.get("keywords", []) or skills
 
     return {
         "skills": skills,
         "requiredYearsExperience": parsed.get("requiredYearsExperience", parsed.get("yearsExperience", 0)),
         "yearsExperience": parsed.get("yearsExperience", 0),
         "educationLevel": parsed.get("educationLevel", ""),
-        "keywords": parsed.get("keywords", []),
+        "keywords": keywords,
         "hardFilters": parsed.get("hardFilters", {}),
         "embedding": embedding_doc.get("vector") or parsed.get("embedding") or [],
         "processingStatus": status_doc.get("value") or inline_status or payload.get("status") or "",
@@ -83,7 +84,7 @@ def _extract_skills_from_sections(parsed: dict[str, Any]) -> list[str]:
     """Best-effort skills extraction from ParsedDocument sections."""
     sections = parsed.get("sections") or []
     if not isinstance(sections, list):
-        return []
+        sections = []
 
     skill_blocks: list[str] = []
     for section in sections:
@@ -96,7 +97,23 @@ def _extract_skills_from_sections(parsed: dict[str, Any]) -> list[str]:
                 skill_blocks.append(content)
 
     if not skill_blocks:
-        return []
+        extracted_text = str(parsed.get("extractedText", "")).strip()
+        if extracted_text:
+            lines = [line.strip() for line in extracted_text.splitlines() if line.strip()]
+            for idx, line in enumerate(lines):
+                normalized = line.lower()
+                if any(token in normalized for token in ("skills", "technologies", "competencies")):
+                    if ":" in line:
+                        skill_blocks.append(line.split(":", 1)[1].strip())
+                    else:
+                        # Take a few lines following the skills header.
+                        tail = []
+                        for next_line in lines[idx + 1 : idx + 4]:
+                            if any(token in next_line.lower() for token in ("experience", "education", "project", "summary")):
+                                break
+                            tail.append(next_line)
+                        if tail:
+                            skill_blocks.append(" ".join(tail))
 
     raw = "\n".join(skill_blocks)
     # Split on common delimiters and bullets.
@@ -128,7 +145,7 @@ def _get_client() -> firestore.Client:
     return _client
 
 
-def write_candidate(candidate_id: str, name: str, email: str, gcs_url: str) -> None:
+def write_candidate(candidate_id: str, name: str, email: str, gcs_url: str, job_id: str) -> None:
     """Write a new candidate document to Firestore."""
     db = _get_client()
     doc_ref = db.collection(COLLECTION_CANDIDATES).document(candidate_id)
@@ -138,6 +155,7 @@ def write_candidate(candidate_id: str, name: str, email: str, gcs_url: str) -> N
             "name": name,
             "email": email,
             "resumeUrl": gcs_url,
+            "appliedJobId": job_id,
             "uploadedAt": datetime.now(timezone.utc).isoformat(),
             "status": "uploaded",
             "emailApproved": False,
@@ -220,13 +238,18 @@ def get_job_processed_artifact(job_id: str) -> dict[str, Any] | None:
     return _select_nlp_artifact(payload, subcollection_artifacts=subcollection_artifacts)
 
 
-def get_candidate_processed_artifacts(candidate_ids: list[str] | None = None) -> list[dict[str, Any]]:
+def get_candidate_processed_artifacts(
+    candidate_ids: list[str] | None = None,
+    job_id: str | None = None,
+) -> list[dict[str, Any]]:
     """Read Tanay-processed candidate artifacts from candidate docs."""
     db = _get_client()
     refs = db.collection(COLLECTION_CANDIDATES)
 
     if candidate_ids is not None:
         docs = [refs.document(candidate_id).get() for candidate_id in candidate_ids]
+    elif job_id:
+        docs = list(refs.where("appliedJobId", "==", job_id).stream())
     else:
         docs = list(refs.stream())
 
@@ -244,6 +267,7 @@ def get_candidate_processed_artifacts(candidate_ids: list[str] | None = None) ->
                 "name": payload.get("name", ""),
                 "email": payload.get("email", ""),
                 "resumeUrl": payload.get("resumeUrl", ""),
+                "appliedJobId": payload.get("appliedJobId", ""),
                 "skills": processed["skills"],
                 "yearsExperience": processed["yearsExperience"],
                 "educationLevel": processed["educationLevel"],
