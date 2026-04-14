@@ -15,6 +15,7 @@ import {
   saveRecruiterUploadState,
 } from "@/lib/persistence";
 import type { BackendProcessingStatus, JobDescription, PipelineStage } from "@/lib/types";
+import { DocumentPreview } from "@/components/ui/DocumentPreview";
 
 const INITIAL_STAGES: PipelineStage[] = [
   { label: "Upload",    status: "pending" },
@@ -224,6 +225,14 @@ function RecruiterPageContent() {
             onFile={setFile}
             hint="PDF only — max 10 MB"
           />
+
+          {file && (
+            <DocumentPreview
+              file={file}
+              title="JD Preview"
+              heightClass="h-[420px]"
+            />
+          )}
 
           {error && (
             <p className="rounded-lg bg-danger-50 border border-danger-200 px-3 py-2 text-sm text-danger-700">

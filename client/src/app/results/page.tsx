@@ -121,6 +121,7 @@ function ResultsContent() {
               candidate={candidate}
               onApproveEmail={approveEmail}
               dashboardHref={jobId ? `/dashboard?jobId=${jobId}&candidateId=${candidate.id}` : undefined}
+              reviewHref={jobId ? `/review?jobId=${jobId}&candidateId=${candidate.id}` : undefined}
             />
           ))}
         </div>

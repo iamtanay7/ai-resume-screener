@@ -1,6 +1,7 @@
 "use client";
 
 import { Suspense, useEffect, useMemo, useState } from "react";
+import Link from "next/link";
 import { useSearchParams } from "next/navigation";
 import { generateExplanationFromRanking, getResults } from "@/lib/api";
 import type { Candidate, CandidateStatus, ExplainabilityResponse } from "@/lib/types";
@@ -125,20 +126,30 @@ function DashboardContent() {
 
         <div className="mt-4 space-y-2">
           {candidates.map((candidate) => (
-            <button
-              key={candidate.id}
-              type="button"
-              onClick={() => setSelectedCandidateId(candidate.id)}
-              className={[
-                "w-full rounded-lg border px-3 py-2 text-left transition-colors",
-                selectedCandidateId === candidate.id
-                  ? "border-primary-500 bg-primary-50"
-                  : "border-neutral-200 bg-white hover:border-primary-300",
-              ].join(" ")}
-            >
-              <p className="text-sm font-medium text-neutral-800">{candidate.name}</p>
-              <p className="text-xs text-neutral-500">{jobTitle}</p>
-            </button>
+            <div key={candidate.id} className="space-y-1">
+              <button
+                type="button"
+                onClick={() => setSelectedCandidateId(candidate.id)}
+                className={[
+                  "w-full rounded-lg border px-3 py-2 text-left transition-colors",
+                  selectedCandidateId === candidate.id
+                    ? "border-primary-500 bg-primary-50"
+                    : "border-neutral-200 bg-white hover:border-primary-300",
+                ].join(" ")}
+              >
+                <p className="text-sm font-medium text-neutral-800">{candidate.name}</p>
+                <p className="text-xs text-neutral-500">{jobTitle}</p>
+              </button>
+              {selectedCandidateId === candidate.id && jobId && (
+                <Link
+                  href={`/review?jobId=${jobId}&candidateId=${candidate.id}`}
+                  className="flex items-center gap-1 rounded-lg border border-neutral-200 bg-white px-3 py-1.5 text-xs font-medium text-neutral-600 hover:border-primary-300 hover:text-primary-700 transition-colors"
+                >
+                  <DocumentIcon />
+                  Compare Documents
+                </Link>
+              )}
+            </div>
           ))}
 
           {!loadingCandidates && !candidates.length && (
@@ -232,6 +243,14 @@ export default function DashboardPage() {
     <Suspense fallback={<div className="page-container">Loading dashboard...</div>}>
       <DashboardContent />
     </Suspense>
+  );
+}
+
+function DocumentIcon() {
+  return (
+    <svg className="h-3.5 w-3.5" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2}>
+      <path strokeLinecap="round" strokeLinejoin="round" d="M19.5 14.25v-2.625a3.375 3.375 0 00-3.375-3.375h-1.5A1.125 1.125 0 0113.5 7.125v-1.5a3.375 3.375 0 00-3.375-3.375H8.25m0 12.75h7.5m-7.5 3H12M10.5 2.25H5.625c-.621 0-1.125.504-1.125 1.125v17.25c0 .621.504 1.125 1.125 1.125h12.75c.621 0 1.125-.504 1.125-1.125V11.25a9 9 0 00-9-9z" />
+    </svg>
   );
 }
 

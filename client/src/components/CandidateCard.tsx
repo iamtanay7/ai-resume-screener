@@ -12,9 +12,10 @@ interface CandidateCardProps {
   candidate: Candidate;
   onApproveEmail: (candidateId: string) => Promise<void>;
   dashboardHref?: string;
+  reviewHref?: string;
 }
 
-export function CandidateCard({ candidate, onApproveEmail, dashboardHref }: CandidateCardProps) {
+export function CandidateCard({ candidate, onApproveEmail, dashboardHref, reviewHref }: CandidateCardProps) {
   const [expanded, setExpanded] = useState(false);
   const [approving, setApproving] = useState(false);
   const [approved, setApproved] = useState(false);
@@ -113,8 +114,15 @@ export function CandidateCard({ candidate, onApproveEmail, dashboardHref }: Cand
           )}
 
           {/* Approve email CTA */}
-          {(candidate.status !== "reject" || dashboardHref) && (
-            <div className="flex justify-end gap-2">
+          {(candidate.status !== "reject" || dashboardHref || reviewHref) && (
+            <div className="flex flex-wrap justify-end gap-2">
+              {reviewHref && (
+                <Link href={reviewHref}>
+                  <Button variant="secondary" size="sm">
+                    Compare Documents
+                  </Button>
+                </Link>
+              )}
               {dashboardHref && (
                 <Link href={dashboardHref}>
                   <Button variant="secondary" size="sm">
@@ -122,15 +130,17 @@ export function CandidateCard({ candidate, onApproveEmail, dashboardHref }: Cand
                   </Button>
                 </Link>
               )}
-              <Button
-                variant={approved ? "secondary" : "primary"}
-                size="sm"
-                loading={approving}
-                disabled={approved}
-                onClick={handleApprove}
-              >
-                {approved ? "Email Approved ✓" : "Approve Email"}
-              </Button>
+              {candidate.status !== "reject" && (
+                <Button
+                  variant={approved ? "secondary" : "primary"}
+                  size="sm"
+                  loading={approving}
+                  disabled={approved}
+                  onClick={handleApprove}
+                >
+                  {approved ? "Email Approved ✓" : "Approve Email"}
+                </Button>
+              )}
             </div>
           )}
         </div>
