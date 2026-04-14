@@ -42,12 +42,14 @@ export async function uploadJD(
 export async function uploadResume(
   file: File,
   email: string,
-  name: string
+  name: string,
+  jobId: string
 ): Promise<UploadResumeResponse> {
   const form = new FormData();
   form.append("file", file);
   form.append("email", email);
   form.append("name", name);
+  form.append("jobId", jobId);
 
   const res = await fetch(`${BASE_URL}/upload/resume`, {
     method: "POST",

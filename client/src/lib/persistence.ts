@@ -2,6 +2,7 @@ export interface CandidateUploadState {
   candidateId: string;
   name: string;
   email: string;
+  jobId: string;
 }
 
 export interface RecruiterUploadState {
