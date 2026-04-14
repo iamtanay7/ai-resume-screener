@@ -6,6 +6,13 @@ from server.explainability.gemini import generate_gemini_explanation
 from server.explainability.mock_data import MOCK_CANDIDATES
 
 
+def _to_int(value: Any) -> int:
+    try:
+        return int(round(float(value)))
+    except (TypeError, ValueError):
+        return 0
+
+
 def resolve_candidate(payload: dict[str, Any]) -> dict[str, Any]:
     mode = payload.get("mode", "candidate_id")
 
@@ -108,7 +115,13 @@ def build_rule_based_explanation(candidate: dict[str, Any], decision: str) -> di
 
 def generate_explanation(payload: dict[str, Any]) -> dict[str, Any]:
     candidate = resolve_candidate(payload)
-    decision = choose_decision(candidate.get("overall_score", 0))
+    overall_score = _to_int(candidate.get("overall_score", 0))
+    years_experience = _to_int(candidate.get("years_experience", 0))
+    score_breakdown = {
+        key: _to_int(value)
+        for key, value in (candidate.get("score_breakdown", {}) or {}).items()
+    }
+    decision = choose_decision(overall_score)
 
     try:
         ai_response = generate_gemini_explanation(candidate, decision)
@@ -116,26 +129,23 @@ def generate_explanation(payload: dict[str, Any]) -> dict[str, Any]:
         ai_response = None
 
     explanation = ai_response or build_rule_based_explanation(candidate, decision)
-    confidence_score = build_confidence(
-        candidate.get("score_breakdown", {}),
-        candidate.get("overall_score", 0),
-    )
+    confidence_score = build_confidence(score_breakdown, overall_score)
 
     response = {
         "candidate_id": candidate["candidate_id"],
         "candidate_name": candidate["candidate_name"],
         "job_title": candidate.get("job_title", "Applied Role"),
-        "overall_score": candidate.get("overall_score", 0),
-        "years_experience": candidate.get("years_experience", 0),
+        "overall_score": overall_score,
+        "years_experience": years_experience,
         "decision": explanation["decision"],
         "summary": explanation["summary"],
         "strengths": explanation["strengths"],
         "weaknesses": explanation["weaknesses"],
         "recommendation": explanation["recommendation"],
-        "score_breakdown": candidate["score_breakdown"],
+        "score_breakdown": score_breakdown,
         "matched_skills": candidate.get("matched_skills", []),
         "missing_skills": candidate.get("missing_skills", []),
-        "confidence_score": confidence_score,
+        "confidence_score": _to_int(confidence_score),
         "jd_summary": candidate.get("jd_summary", ""),
         "fairness_note": "This explanation supports recruiter review and should not be used as the sole hiring decision.",
         "source": "gemini" if ai_response else "rule_based",
