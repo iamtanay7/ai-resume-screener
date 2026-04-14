@@ -135,7 +135,44 @@ def _extract_skills_from_sections(parsed: dict[str, Any]) -> list[str]:
         seen.add(key)
         skills.append(part)
 
-    return skills
+    if skills:
+        return skills
+
+    extracted_text = str(parsed.get("extractedText", "")).lower()
+    if not extracted_text:
+        return []
+
+    # Final fallback: infer skills from a lightweight lexicon.
+    lexicon = [
+        "python", "java", "javascript", "typescript", "c++", "c#", "go", "golang",
+        "ruby", "php", "swift", "kotlin", "scala", "rust",
+        "react", "next.js", "node.js", "express", "fastapi", "django", "flask",
+        "html", "css", "tailwind", "sass",
+        "sql", "postgres", "postgresql", "mysql", "sqlite", "mongodb", "redis",
+        "aws", "gcp", "azure", "docker", "kubernetes", "terraform", "ansible",
+        "linux", "git", "ci/cd", "devops",
+        "pandas", "numpy", "scikit-learn", "tensorflow", "pytorch",
+        "spark", "hadoop", "kafka",
+        "machine learning", "data science", "data engineering",
+        "rest", "graphql",
+    ]
+
+    inferred: list[str] = []
+    for token in lexicon:
+        if token in extracted_text:
+            inferred.append(token)
+
+    # Normalize duplicates while preserving lexicon order.
+    deduped: list[str] = []
+    seen = set()
+    for token in inferred:
+        key = token.lower()
+        if key in seen:
+            continue
+        seen.add(key)
+        deduped.append(token)
+
+    return deduped
 
 
 def _get_client() -> firestore.Client:
