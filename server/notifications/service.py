@@ -63,12 +63,15 @@ def preview_candidate_email(candidate_id: str) -> dict[str, Any]:
     explanation = generate_explanation(
         _explainability_payload(candidate_id, candidate, job, ranked, processed)
     )
+    hard_filters = ranked.get("hardFilterMetadata") or {}
+    hard_filter_reason = _format_hard_filter_reason(hard_filters)
     email_candidate = {
         "candidate_name": ranked.get("name") or candidate.get("name") or "Candidate",
         "candidate_email": candidate.get("email", ""),
         "job_title": job.get("title", "Applied Role"),
         "matched_skills": ranked.get("matchedSkills", []) or [],
         "missing_skills": ranked.get("missingSkills", []) or [],
+        "hard_filter_reason": hard_filter_reason,
     }
     email_content = build_candidate_email(email_candidate, explanation)
     return {
@@ -102,3 +105,24 @@ def approve_and_send_candidate_email(candidate_id: str) -> dict[str, str]:
         "detail": result["detail"],
         "message": "Email approved and processed.",
     }
+
+
+def _format_hard_filter_reason(hard_filters: dict[str, Any]) -> str | None:
+    if not hard_filters:
+        return None
+
+    if hard_filters.get("passed") is True:
+        return None
+
+    if hard_filters.get("locationRequired") and not hard_filters.get("locationPassed"):
+        required = hard_filters.get("locationRequired")
+        return f"Location requirement ({required}) was not met."
+
+    if hard_filters.get("workAuthRequired") and not hard_filters.get("workAuthPassed"):
+        return "Work authorization requirement was not met."
+
+    if hard_filters.get("minYearsExperienceRequired") and not hard_filters.get("minYearsPassed"):
+        required = hard_filters.get("minYearsExperienceRequired")
+        return f"Minimum experience requirement ({required} years) was not met."
+
+    return "One or more required filters were not met."
