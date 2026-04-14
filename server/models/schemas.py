@@ -52,6 +52,12 @@ class ParsedDocument(BaseModel):
     sourceUrl: str
     extractedText: str
     sections: list[DocumentSection]
+    skills: list[str] = Field(default_factory=list)
+    keywords: list[str] = Field(default_factory=list)
+    educationLevel: str = ""
+    yearsExperience: float = 0.0
+    requiredYearsExperience: float = 0.0
+    hardFilters: dict[str, Any] = Field(default_factory=dict)
     metadata: dict[str, str] = Field(default_factory=dict)
 
 

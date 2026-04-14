@@ -5,14 +5,13 @@ from __future__ import annotations
 import logging
 import re
 from dataclasses import dataclass
+from typing import Any
 
-import vertexai
 from google.api_core.client_options import ClientOptions
-from google.cloud import documentai
 from server.config import settings
 from server.models.schemas import DocumentSection, EmbeddingRecord, ParsedDocument
 from server.services import firestore_db, ranking_engine, storage
-from vertexai.language_models import TextEmbeddingModel
+from server.services.nlp_normalization import build_structured_fields
 
 logger = logging.getLogger(__name__)
 
@@ -25,8 +24,8 @@ SECTION_ALIASES = {
     "certifications": {"certifications", "certificates", "licenses"},
 }
 
-_documentai_client: documentai.DocumentProcessorServiceClient | None = None
-_embedding_model: TextEmbeddingModel | None = None
+_documentai_client: Any | None = None
+_embedding_model: Any | None = None
 _vertex_initialized = False
 
 
@@ -91,6 +90,8 @@ def parse_document(event: UploadEvent) -> ParsedDocument:
     file_bytes = storage.download_file(event.gcs_path)
     mime_type = _guess_mime_type(event.gcs_path)
 
+    from google.cloud import documentai
+
     client = _get_documentai_client()
     request = documentai.ProcessRequest(
         name=_processor_name(_processor_id_for_event(event)),
@@ -107,12 +108,23 @@ def parse_document(event: UploadEvent) -> ParsedDocument:
         raise ValueError(f"Document AI returned no text for {event.gcs_path}.")
 
     sections = _extract_sections(extracted_text)
+    structured = build_structured_fields(
+        extracted_text=extracted_text,
+        sections=[section.model_dump() for section in sections],
+        kind=kind,
+    )
     return ParsedDocument(
         documentId=event.document_id,
         kind=kind,
         sourceUrl=event.gcs_path,
         extractedText=extracted_text,
         sections=sections,
+        skills=structured["skills"],
+        keywords=structured["keywords"],
+        educationLevel=structured["educationLevel"],
+        yearsExperience=structured["yearsExperience"],
+        requiredYearsExperience=structured["requiredYearsExperience"],
+        hardFilters=structured["hardFilters"],
         metadata={
             "documentAiLocation": settings.document_ai_location,
             "processorId": _processor_id_for_event(event),
@@ -155,9 +167,11 @@ def _mark_status(event: UploadEvent, status: str, error: str | None = None) -> N
     firestore_db.mark_job_processing(event.document_id, status, error=error)
 
 
-def _get_documentai_client() -> documentai.DocumentProcessorServiceClient:
+def _get_documentai_client() -> Any:
     global _documentai_client
     if _documentai_client is None:
+        from google.cloud import documentai
+
         _documentai_client = documentai.DocumentProcessorServiceClient(
             client_options=ClientOptions(
                 api_endpoint=f"{settings.document_ai_location}-documentai.googleapis.com",
@@ -175,6 +189,9 @@ def _processor_name(processor_id: str) -> str:
 
 def _get_embedding_model() -> TextEmbeddingModel:
     global _embedding_model, _vertex_initialized
+    import vertexai
+    from vertexai.language_models import TextEmbeddingModel
+
     if not _vertex_initialized:
         vertexai.init(project=settings.gcp_project_id, location=settings.gcp_region)
         _vertex_initialized = True
