@@ -45,6 +45,9 @@ def test_firestore_helpers_read_artifacts_and_persist_ranking(fake_firestore):
     firestore_db.persist_candidate_ranking(
         candidate_id="c1",
         job_id="j1",
+        name="Alice",
+        email="alice@example.com",
+        resume_url="gs://bucket/resume.pdf",
         rank=1,
         score_breakdown={"skills": 100, "experience": 100, "education": 100, "keywords": 100, "overall": 100},
         status="shortlist",
@@ -58,9 +61,10 @@ def test_firestore_helpers_read_artifacts_and_persist_ranking(fake_firestore):
     assert job["embedding"] == [0.1, 0.2, 0.3]
     assert candidates[0]["id"] == "c1"
     assert candidates[0]["embedding"] == [1.0, 2.0]
-    assert fake_firestore["candidates"]["c1"]["jobId"] == "j1"
-    assert fake_firestore["candidates"]["c1"]["hardFilterMetadata"]["passed"] is True
-    assert fake_firestore["candidates"]["c1"]["rankingVersion"] == "v1"
+    ranked = fake_firestore["jobResults"]["j1"]["_subcollections"]["candidates"]["c1"]
+    assert ranked["jobId"] == "j1"
+    assert ranked["hardFilterMetadata"]["passed"] is True
+    assert ranked["rankingVersion"] == "v1"
 
 
 def test_firestore_helpers_support_subcollection_fallback_for_candidate(fake_firestore):
@@ -138,6 +142,40 @@ def test_firestore_helpers_empty_candidate_ids_returns_no_candidates(fake_firest
     candidates = firestore_db.get_candidate_processed_artifacts([])
 
     assert candidates == []
+
+
+def test_firestore_helpers_derive_structure_from_text_only_parsed_docs(fake_firestore):
+    fake_firestore["jobs"]["j-text"] = {
+        "id": "j-text",
+        "_subcollections": {
+            "nlpArtifacts": {
+                "status": {"value": "processed"},
+                "parsed": {
+                    "kind": "job_description",
+                    "extractedText": (
+                        "Principal Autonomous Surgical Robotics Safety Architect\n"
+                        "Location: Cambridge, MA\n"
+                        "Required Qualifications\n"
+                        "PhD in Robotics or related field.\n"
+                        "12+ years of hands-on industry experience.\n"
+                        "Expert-level mastery of modern C++, embedded Linux, computer vision, ROS 2, CUDA, and FPGA.\n"
+                        "IEC 60601, IEC 62304, ISO 13485, ISO 14971, and FDA design controls.\n"
+                    ),
+                    "sections": [{"title": "full_text", "content": "same"}],
+                },
+            }
+        },
+    }
+
+    job = firestore_db.get_job_processed_artifact("j-text")
+
+    assert job is not None
+    assert job["requiredYearsExperience"] == 12.0
+    assert job["educationLevel"] == "phd"
+    assert "C++" in job["skills"]
+    assert "Linux" in job["skills"]
+    assert "FDA" in job["keywords"]
+    assert job["rankingReady"] is True
 
 
 # ── Results router tests ─────────────────────────────────────────────────────

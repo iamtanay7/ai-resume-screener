@@ -11,7 +11,10 @@ from server.services import ranking_engine
 def _stub_firestore(monkeypatch, *, job, candidates, writes):
     """Wire up monkeypatches for the three Firestore calls the engine makes."""
     monkeypatch.setattr("server.services.firestore_db.get_job_processed_artifact", lambda job_id: job)
-    monkeypatch.setattr("server.services.firestore_db.get_candidate_processed_artifacts", lambda candidate_ids=None: candidates)
+    monkeypatch.setattr(
+        "server.services.firestore_db.get_candidate_processed_artifacts",
+        lambda candidate_ids=None, job_id=None: candidates,
+    )
     monkeypatch.setattr("server.services.firestore_db.persist_candidate_ranking", lambda **kwargs: writes.append(kwargs))
 
 
@@ -238,6 +241,45 @@ def test_run_ranking_uses_configured_thresholds(monkeypatch):
     assert writes[0]["status"] == "shortlist"
 
 
+def test_run_ranking_penalizes_underqualified_education_more_strongly(monkeypatch):
+    writes: list[dict[str, Any]] = []
+    job = {
+        "skills": ["python"],
+        "requiredYearsExperience": 1,
+        "educationLevel": "phd",
+        "keywords": [],
+        "hardFilters": {},
+        "processingStatus": "processed",
+    }
+    candidates = [
+        {
+            "id": "bachelors-only",
+            "skills": ["python"],
+            "yearsExperience": 5,
+            "educationLevel": "bachelors",
+            "keywords": [],
+            "hardFilters": {},
+            "processingStatus": "processed",
+        },
+        {
+            "id": "phd-match",
+            "skills": ["python"],
+            "yearsExperience": 5,
+            "educationLevel": "phd",
+            "keywords": [],
+            "hardFilters": {},
+            "processingStatus": "processed",
+        },
+    ]
+
+    _stub_firestore(monkeypatch, job=job, candidates=candidates, writes=writes)
+    ranking_engine.run_ranking("job-education-gap")
+
+    by_id = {row["candidate_id"]: row for row in writes}
+    assert by_id["phd-match"]["score_breakdown"]["education"] == 100.0
+    assert by_id["bachelors-only"]["score_breakdown"]["education"] == 25.0
+
+
 # ── Deferred / incomplete inputs ─────────────────────────────────────────────
 
 
@@ -245,7 +287,7 @@ def test_run_ranking_deferred_when_job_artifact_missing(monkeypatch):
     monkeypatch.setattr("server.services.firestore_db.get_job_processed_artifact", lambda job_id: None)
     monkeypatch.setattr(
         "server.services.firestore_db.get_candidate_processed_artifacts",
-        lambda candidate_ids=None: [{"id": "c1", "skills": ["python"], "processingStatus": "processed"}],
+        lambda candidate_ids=None, job_id=None: [{"id": "c1", "skills": ["python"], "processingStatus": "processed"}],
     )
 
     count = ranking_engine.run_ranking("missing-job")
@@ -259,7 +301,7 @@ def test_run_ranking_deferred_when_job_not_processed(monkeypatch):
     )
     monkeypatch.setattr(
         "server.services.firestore_db.get_candidate_processed_artifacts",
-        lambda candidate_ids=None: [{"id": "c1", "skills": ["python"], "processingStatus": "processed"}],
+        lambda candidate_ids=None, job_id=None: [{"id": "c1", "skills": ["python"], "processingStatus": "processed"}],
     )
 
     count = ranking_engine.run_ranking("job-processing")
@@ -274,7 +316,7 @@ def test_run_ranking_skips_incomplete_candidate_artifacts(monkeypatch):
     )
     monkeypatch.setattr(
         "server.services.firestore_db.get_candidate_processed_artifacts",
-        lambda candidate_ids=None: [
+        lambda candidate_ids=None, job_id=None: [
             {"id": "not-ready", "skills": ["python"], "processingStatus": "processing"},
             {"id": "no-artifacts", "skills": [], "embedding": [], "keywords": [], "processingStatus": ""},
             {"id": "good", "skills": ["python"], "yearsExperience": 1, "educationLevel": "", "keywords": [], "hardFilters": {}, "processingStatus": "processed"},
@@ -411,3 +453,63 @@ def test_run_ranking_invalid_embeddings_fall_back_to_lexical_only(monkeypatch):
     for row in writes:
         assert set(row["score_breakdown"].keys()) == {"skills", "experience", "education", "keywords", "overall"}
         assert row["score_breakdown"]["overall"] == 100.0
+
+
+def test_run_ranking_skips_candidates_applied_to_other_jobs(monkeypatch):
+    writes: list[dict[str, Any]] = []
+    job = {
+        "skills": ["python"],
+        "requiredYearsExperience": 1,
+        "educationLevel": "bachelors",
+        "keywords": ["etl"],
+        "hardFilters": {},
+        "processingStatus": "processed",
+    }
+    candidates = [
+        {
+            "id": "wrong-job",
+            "appliedJobId": "job-other",
+            "skills": ["python"],
+            "yearsExperience": 5,
+            "educationLevel": "bachelors",
+            "keywords": ["etl"],
+            "hardFilters": {},
+            "processingStatus": "processed",
+        },
+        {
+            "id": "right-job",
+            "appliedJobId": "job-target",
+            "skills": ["python"],
+            "yearsExperience": 5,
+            "educationLevel": "bachelors",
+            "keywords": ["etl"],
+            "hardFilters": {},
+            "processingStatus": "processed",
+        },
+    ]
+
+    _stub_firestore(monkeypatch, job=job, candidates=candidates, writes=writes)
+
+    assert ranking_engine.run_ranking("job-target") == 1
+    assert [row["candidate_id"] for row in writes] == ["right-job"]
+
+
+def test_run_ranking_defers_when_job_lacks_structured_scoring_signals(monkeypatch):
+    monkeypatch.setattr(
+        "server.services.firestore_db.get_job_processed_artifact",
+        lambda job_id: {
+            "skills": [],
+            "keywords": [],
+            "educationLevel": "",
+            "requiredYearsExperience": 0,
+            "hardFilters": {},
+            "processingStatus": "processed",
+            "rankingReady": False,
+        },
+    )
+    monkeypatch.setattr(
+        "server.services.firestore_db.get_candidate_processed_artifacts",
+        lambda candidate_ids=None, job_id=None: [{"id": "c1", "skills": ["python"], "processingStatus": "processed"}],
+    )
+
+    assert ranking_engine.run_ranking("job-no-structure") == 0

@@ -6,6 +6,7 @@ from typing import Any
 from google.cloud import firestore
 
 from server.config import settings
+from server.services.nlp_normalization import build_structured_fields
 
 _client: firestore.Client | None = None
 
@@ -65,18 +66,35 @@ def _select_nlp_artifact(payload: dict[str, Any], subcollection_artifacts: dict[
     if isinstance(inline_status, dict):
         inline_status = inline_status.get("value")
 
-    skills = parsed.get("skills", []) or _extract_skills_from_sections(parsed)
-    keywords = parsed.get("keywords", []) or skills
+    extracted_text = str(parsed.get("extractedText", "")).strip()
+    sections = parsed.get("sections") or []
+    kind = str(parsed.get("kind") or payload.get("kind") or "").strip().lower()
+    derived = build_structured_fields(extracted_text=extracted_text, sections=sections, kind=kind or "job_description")
+
+    skills = parsed.get("skills", []) or derived["skills"] or _extract_skills_from_sections(parsed)
+    keywords = parsed.get("keywords", []) or derived["keywords"]
+    required_years = parsed.get("requiredYearsExperience")
+    years_experience = parsed.get("yearsExperience")
+    education_level = parsed.get("educationLevel", "") or derived["educationLevel"]
+    hard_filters = parsed.get("hardFilters", {}) or derived["hardFilters"]
+    ranking_ready = bool(
+        skills
+        or keywords
+        or _to_float(required_years if required_years is not None else derived["requiredYearsExperience"]) > 0
+        or education_level
+        or hard_filters
+    )
 
     return {
         "skills": skills,
-        "requiredYearsExperience": parsed.get("requiredYearsExperience", parsed.get("yearsExperience", 0)),
-        "yearsExperience": parsed.get("yearsExperience", 0),
-        "educationLevel": parsed.get("educationLevel", ""),
+        "requiredYearsExperience": required_years if required_years is not None else derived["requiredYearsExperience"],
+        "yearsExperience": years_experience if years_experience is not None else derived["yearsExperience"],
+        "educationLevel": education_level,
         "keywords": keywords,
-        "hardFilters": parsed.get("hardFilters", {}),
+        "hardFilters": hard_filters,
         "embedding": embedding_doc.get("vector") or parsed.get("embedding") or [],
         "processingStatus": status_doc.get("value") or inline_status or payload.get("status") or "",
+        "rankingReady": ranking_ready,
     }
 
 
@@ -173,6 +191,13 @@ def _extract_skills_from_sections(parsed: dict[str, Any]) -> list[str]:
         deduped.append(token)
 
     return deduped
+
+
+def _to_float(value: Any) -> float:
+    try:
+        return float(value)
+    except (TypeError, ValueError):
+        return 0.0
 
 
 def _get_client() -> firestore.Client:

@@ -41,3 +41,11 @@ tmp/
 
 # Local Python environments
 .venv312/
+
+# Local agent/debug artifacts
+.agent/
+.sisyphus/
+TEST_FILES/
+*_HANDOFF.md
+walkthrough.md
+server/tests/_ranking_test_files_preview.html

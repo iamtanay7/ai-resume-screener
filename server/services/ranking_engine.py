@@ -3,11 +3,21 @@
 from __future__ import annotations
 
 from dataclasses import dataclass
+import logging
 import math
 from typing import Any
 
 from server.config import settings
 from server.services import firestore_db
+
+logger = logging.getLogger(__name__)
+
+_EDUCATION_RANK = {
+    "associates": 1,
+    "bachelors": 2,
+    "masters": 3,
+    "phd": 4,
+}
 
 
 def _weights() -> dict[str, float]:
@@ -91,6 +101,17 @@ def _is_processed(status: Any, has_artifact_content: bool) -> bool:
     return has_artifact_content
 
 
+def _has_job_scoring_signals(job_data: dict[str, Any]) -> bool:
+    return bool(
+        job_data.get("rankingReady")
+        or job_data.get("skills")
+        or job_data.get("keywords")
+        or str(job_data.get("educationLevel", "")).strip()
+        or _to_float(job_data.get("requiredYearsExperience")) > 0
+        or (job_data.get("hardFilters") or {})
+    )
+
+
 def _hard_filter_outcome(job_data: dict[str, Any], candidate_data: dict[str, Any]) -> dict[str, Any]:
     job_filters = job_data.get("hardFilters") or {}
     candidate_filters = candidate_data.get("hardFilters") or {}
@@ -124,6 +145,24 @@ def _hard_filter_outcome(job_data: dict[str, Any], candidate_data: dict[str, Any
     }
 
 
+def _education_score(job_education: str, candidate_education: str) -> float:
+    if not job_education:
+        return 100.0
+    if not candidate_education:
+        return 0.0
+
+    job_rank = _EDUCATION_RANK.get(job_education, 0)
+    candidate_rank = _EDUCATION_RANK.get(candidate_education, 0)
+    if not job_rank or not candidate_rank:
+        return 100.0 if job_education == candidate_education else 40.0
+    if candidate_rank >= job_rank:
+        return 100.0
+    gap = job_rank - candidate_rank
+    if gap == 1:
+        return 55.0
+    return 25.0
+
+
 def _score_candidate(job_data: dict[str, Any], candidate_data: dict[str, Any], candidate_id: str) -> ScoredCandidate:
     weights = _weights()
     job_skills = _normalize_skill_set(job_data.get("skills"))
@@ -151,7 +190,7 @@ def _score_candidate(job_data: dict[str, Any], candidate_data: dict[str, Any], c
 
     job_edu = str(job_data.get("educationLevel", "")).strip().lower()
     candidate_edu = str(candidate_data.get("educationLevel", "")).strip().lower()
-    education_score = 100.0 if not job_edu else (100.0 if job_edu == candidate_edu else 60.0 if candidate_edu else 0.0)
+    education_score = _education_score(job_edu, candidate_edu)
 
     keywords_score = 100.0 if not job_keywords else (len(job_keywords.intersection(candidate_keywords)) / len(job_keywords)) * 100.0
 
@@ -197,6 +236,9 @@ def run_ranking(job_id: str, candidate_ids: list[str] | None = None) -> int:
 
     job_has_artifact_content = bool(job_data.get("skills") or job_data.get("embedding") or job_data.get("keywords"))
     if not _is_processed(job_data.get("processingStatus"), has_artifact_content=job_has_artifact_content):
+        return 0
+    if not _has_job_scoring_signals(job_data):
+        logger.warning("Ranking deferred for job %s due to incomplete structured job artifact.", job_id)
         return 0
 
     candidates = firestore_db.get_candidate_processed_artifacts(candidate_ids, job_id=job_id)

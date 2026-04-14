@@ -48,6 +48,9 @@ class FakeDocRef:
         existing = self.collection_store.setdefault(self.doc_id, {"id": self.doc_id})
         existing.update(payload)
 
+    def set(self, payload: dict) -> None:
+        self.collection_store[self.doc_id] = payload
+
 
 class FakeQuery:
     """Simulates a Firestore query with chained where/order_by."""
@@ -108,6 +111,6 @@ def fake_firestore(monkeypatch):
             fake_firestore["jobs"]["j1"] = {"id": "j1", ...}
             result = firestore_db.get_job_processed_artifact("j1")
     """
-    data: dict[str, dict] = {"jobs": {}, "candidates": {}}
+    data: dict[str, dict] = {"jobs": {}, "candidates": {}, "jobResults": {}}
     monkeypatch.setattr(firestore_db, "_client", FakeClient(data))
     return data
