@@ -397,6 +397,19 @@ def get_job(job_id: str) -> dict[str, Any] | None:
     return doc.to_dict() if doc.exists else None
 
 
+def get_ranked_candidate_result(job_id: str, candidate_id: str) -> dict[str, Any] | None:
+    """Fetch a single ranked candidate record for a specific job."""
+    db = _get_client()
+    doc = (
+        db.collection(COLLECTION_JOB_RESULTS)
+        .document(job_id)
+        .collection("candidates")
+        .document(candidate_id)
+        .get()
+    )
+    return doc.to_dict() if doc.exists else None
+
+
 def approve_email(candidate_id: str) -> None:
     """Mark a candidate's notification email as approved by the recruiter."""
     db = _get_client()
@@ -407,6 +420,29 @@ def approve_email(candidate_id: str) -> None:
             "emailApprovedAt": datetime.now(timezone.utc).isoformat(),
         }
     )
+
+
+def mark_candidate_notification(
+    candidate_id: str,
+    *,
+    status: str,
+    detail: str | None = None,
+    subject: str | None = None,
+) -> None:
+    """Persist the latest email delivery status for a candidate."""
+    db = _get_client()
+    payload: dict[str, Any] = {
+        "notificationStatus": status,
+        "notificationUpdatedAt": datetime.now(timezone.utc).isoformat(),
+    }
+    if detail is not None:
+        payload["notificationDetail"] = detail
+    if subject is not None:
+        payload["notificationSubject"] = subject
+    if status == "sent":
+        payload["notificationSentAt"] = datetime.now(timezone.utc).isoformat()
+
+    db.collection(COLLECTION_CANDIDATES).document(candidate_id).update(payload)
 
 
 def mark_candidate_processing(candidate_id: str, status: str, error: str | None = None) -> None:

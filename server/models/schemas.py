@@ -186,3 +186,5 @@ class ExplainabilityResponse(BaseModel):
 
 class NotifyResponse(BaseModel):
     message: str
+    delivery_status: str | None = None
+    detail: str | None = None

@@ -24,6 +24,13 @@ class Settings(BaseSettings):
     ranking_threshold_manual_review: float = 55.0
     ranking_version: str = "v1"
 
+    email_enabled: bool = False
+    smtp_host: str = ""
+    smtp_port: int = 587
+    smtp_username: str = ""
+    smtp_password: str = ""
+    smtp_sender: str = ""
+
     def model_post_init(self, __context):
         """Validate that ranking weights sum to 1.0 within tolerance."""
         weights_sum = (
