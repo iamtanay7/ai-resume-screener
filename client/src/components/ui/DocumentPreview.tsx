@@ -1,15 +1,15 @@
 "use client";
 
 import { useEffect, useRef, useState } from "react";
+import { getDocumentPreviewUrl } from "@/lib/api";
 
 /**
- * Converts a gs:// Cloud Storage URI to an HTTPS URL that browsers can fetch.
- * Works when the bucket has public (uniform) access. Falls back to showing the raw path.
+ * Resolves a review-page document source into a URL that the browser can fetch.
+ * Private GCS objects are proxied through the backend preview endpoint.
  */
-function gcsToHttpUrl(uri: string): string {
+function resolveRemoteUrl(uri: string): string {
   if (!uri.startsWith("gs://")) return uri;
-  const path = uri.slice("gs://".length);
-  return `https://storage.googleapis.com/${path}`;
+  return getDocumentPreviewUrl(uri);
 }
 
 interface DocumentPreviewProps {
@@ -40,7 +40,7 @@ export function DocumentPreview({ file, src, title, heightClass = "h-[500px]" }:
     return () => URL.revokeObjectURL(url);
   }, [file]);
 
-  const resolvedSrc = objectUrl ?? (src ? gcsToHttpUrl(src) : null);
+  const resolvedSrc = objectUrl ?? (src ? resolveRemoteUrl(src) : null);
   const fileName = file?.name ?? (src ? src.split("/").pop() : "document");
   const isPdf =
     file?.type === "application/pdf" ||
@@ -77,7 +77,7 @@ export function DocumentPreview({ file, src, title, heightClass = "h-[500px]" }:
                   {src ? `GCS path: ${src}` : fileName}
                 </p>
                 <p className="text-xs text-neutral-400">
-                  The file may be stored in a private GCS bucket. Contact your admin for access.
+                  The file preview could not be loaded from storage.
                 </p>
               </>
             ) : !resolvedSrc ? (

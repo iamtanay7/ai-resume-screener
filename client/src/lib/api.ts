@@ -14,6 +14,12 @@ const BASE_URL =
     ? "http://localhost:8000"
     : "https://resume-api-253408457990.us-central1.run.app");
 
+export function getDocumentPreviewUrl(gcsUri: string): string {
+  const url = new URL(`${BASE_URL}/upload/file`);
+  url.searchParams.set("gcsUri", gcsUri);
+  return url.toString();
+}
+
 async function handleResponse<T>(res: Response): Promise<T> {
   if (!res.ok) {
     const body = await res.json().catch(() => ({}));
