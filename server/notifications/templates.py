@@ -11,6 +11,7 @@ def _build_rejection_body(candidate: dict[str, Any], explanation: dict[str, Any]
     name = candidate.get("candidate_name", "Candidate")
     matched_skills = candidate.get("matched_skills", [])
     missing_skills = candidate.get("missing_skills", [])
+    hard_filter_reason = candidate.get("hard_filter_reason")
     strengths_text = _format_skill_list(matched_skills, "some relevant capabilities")
     missing_text = _format_skill_list(missing_skills, "the core requirements for this opening")
     summary = explanation.get(
@@ -23,11 +24,16 @@ def _build_rejection_body(candidate: dict[str, Any], explanation: dict[str, Any]
     if not feedback_lines:
         feedback_lines = "- Your profile was not as closely aligned with the required skills for this role"
 
+    hard_filter_block = ""
+    if hard_filter_reason:
+        hard_filter_block = f"Additional requirement not met: {hard_filter_reason}\n\n"
+
     return (
         f"Dear {name},\n\n"
         "Thank you for the time and effort you invested in applying for this opportunity. "
         "After reviewing your application, we will not be moving forward with your profile for this role.\n\n"
         f"Assessment summary: {summary}\n\n"
+        f"{hard_filter_block}"
         f"We did see relevant experience in: {strengths_text}.\n"
         f"The main skill gaps for this role were: {missing_text}.\n\n"
         "Personalized feedback from the review:\n"
