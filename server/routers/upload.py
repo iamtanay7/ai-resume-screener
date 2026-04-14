@@ -9,10 +9,11 @@ import logging
 import uuid
 from pathlib import Path
 
-from fastapi import APIRouter, Form, HTTPException, UploadFile, status
+from fastapi import APIRouter, Form, HTTPException, Query, Response, UploadFile, status
 
 from server.config import settings
 from server.models.schemas import (
+    DocumentProxyQuery,
     JobListItem,
     ProcessingStatusResponse,
     UploadJDResponse,
@@ -235,3 +236,30 @@ async def get_jd_status(job_id: str) -> ProcessingStatusResponse:
 @router.get("/jds", response_model=list[JobListItem])
 async def list_uploaded_jds() -> list[JobListItem]:
     return [JobListItem(**job) for job in firestore_db.list_jobs()]
+
+
+@router.get("/file")
+async def proxy_uploaded_file(gcsUri: str = Query(..., min_length=6)) -> Response:
+    """
+    Proxy a private GCS object through the backend so browser previews work
+    without making the bucket public.
+    """
+    try:
+        query = DocumentProxyQuery(gcsUri=gcsUri)
+        downloaded = storage.download_file_with_metadata(query.gcsUri)
+    except ValueError as exc:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail=str(exc),
+        ) from exc
+    except Exception as exc:
+        logger.exception("Failed to proxy uploaded file %s: %s", gcsUri, exc)
+        raise HTTPException(
+            status_code=status.HTTP_502_BAD_GATEWAY,
+            detail="Could not load uploaded file preview.",
+        ) from exc
+
+    filename = Path(query.gcsUri).name or "document"
+    media_type = downloaded.content_type or "application/octet-stream"
+    headers = {"Content-Disposition": f'inline; filename="{filename}"'}
+    return Response(content=downloaded.content, media_type=media_type, headers=headers)

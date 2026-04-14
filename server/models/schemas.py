@@ -95,6 +95,10 @@ class ProcessingStatusResponse(BaseModel):
     processingError: str | None = None
 
 
+class DocumentProxyQuery(BaseModel):
+    gcsUri: str
+
+
 class JobListItem(BaseModel):
     id: str
     title: str

@@ -1,10 +1,18 @@
 """Handles all Cloud Storage interactions."""
 
+from dataclasses import dataclass
+
 from google.cloud import storage
 
 from server.config import settings
 
 _client: storage.Client | None = None
+
+
+@dataclass(frozen=True)
+class DownloadedFile:
+    content: bytes
+    content_type: str | None
 
 
 def _get_client() -> storage.Client:
@@ -53,6 +61,30 @@ def download_file(gcs_uri: str) -> bytes:
     bucket = client.bucket(bucket_name)
     blob = bucket.blob(blob_name)
     return blob.download_as_bytes()
+
+
+def download_file_with_metadata(gcs_uri: str) -> DownloadedFile:
+    """
+    Download file content plus content-type metadata from a gs:// URI.
+
+    Args:
+        gcs_uri: Full Cloud Storage URI, e.g. 'gs://bucket/path/file.pdf'
+
+    Returns:
+        DownloadedFile containing the raw content and detected content type.
+    """
+    if not gcs_uri.startswith("gs://"):
+        raise ValueError(f"Expected a gs:// URI, got '{gcs_uri}'.")
+
+    bucket_name, blob_name = _split_gcs_uri(gcs_uri)
+    client = _get_client()
+    bucket = client.bucket(bucket_name)
+    blob = bucket.blob(blob_name)
+
+    return DownloadedFile(
+        content=blob.download_as_bytes(),
+        content_type=blob.content_type,
+    )
 
 
 def _split_gcs_uri(gcs_uri: str) -> tuple[str, str]:
