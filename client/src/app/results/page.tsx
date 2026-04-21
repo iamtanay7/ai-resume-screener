@@ -6,6 +6,7 @@ import { Suspense } from "react";
 import { CandidateCard } from "@/components/CandidateCard";
 import { Button } from "@/components/ui/Button";
 import { StatusBadge } from "@/components/ui/StatusBadge";
+import { ProtectedRoute } from "@/components/ProtectedRoute";
 import { getResults, approveEmail } from "@/lib/api";
 import type { Candidate, CandidateStatus } from "@/lib/types";
 
@@ -132,9 +133,11 @@ function ResultsContent() {
 
 export default function ResultsPage() {
   return (
-    <Suspense fallback={<LoadingSkeleton />}>
-      <ResultsContent />
-    </Suspense>
+    <ProtectedRoute role="recruiter">
+      <Suspense fallback={<LoadingSkeleton />}>
+        <ResultsContent />
+      </Suspense>
+    </ProtectedRoute>
   );
 }
 

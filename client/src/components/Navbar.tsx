@@ -1,6 +1,18 @@
+"use client";
+
 import Link from "next/link";
+import { useRouter } from "next/navigation";
+import { useAuth } from "@/contexts/AuthContext";
 
 export function Navbar() {
+  const { user, logout } = useAuth();
+  const router = useRouter();
+
+  function handleLogout() {
+    logout();
+    router.push("/auth/login");
+  }
+
   return (
     <header className="sticky top-0 z-50 border-b border-neutral-200 bg-white/90 backdrop-blur-sm">
       <div className="mx-auto flex max-w-6xl items-center justify-between px-4 py-3">
@@ -12,31 +24,54 @@ export function Navbar() {
           ResumeAI
         </Link>
 
-        <nav className="flex items-center gap-6 text-sm font-medium text-neutral-600">
-          <Link
-            href="/recruiter"
-            className="hover:text-primary-600 transition-colors"
-          >
-            Recruiter
-          </Link>
-          <Link
-            href="/candidate"
-            className="hover:text-primary-600 transition-colors"
-          >
-            Candidate
-          </Link>
-          <Link
-            href="/results"
-            className="rounded-lg bg-primary-600 px-3 py-1.5 text-white hover:bg-primary-700 transition-colors"
-          >
-            Results
-          </Link>
-          <Link
-            href="/dashboard"
-            className="hover:text-primary-600 transition-colors"
-          >
-            Dashboard
-          </Link>
+        <nav className="flex items-center gap-4 text-sm font-medium text-neutral-600">
+          {user ? (
+            <>
+              {user.role === "recruiter" && (
+                <>
+                  <Link href="/recruiter" className="hover:text-primary-600 transition-colors">
+                    Dashboard
+                  </Link>
+                  <Link
+                    href="/results"
+                    className="rounded-lg bg-primary-600 px-3 py-1.5 text-white hover:bg-primary-700 transition-colors"
+                  >
+                    Results
+                  </Link>
+                </>
+              )}
+              {user.role === "candidate" && (
+                <Link href="/candidate" className="hover:text-primary-600 transition-colors">
+                  My Application
+                </Link>
+              )}
+
+              <div className="flex items-center gap-3 pl-2 border-l border-neutral-200">
+                <div className="text-right hidden sm:block">
+                  <p className="text-xs font-semibold text-neutral-800 leading-tight">{user.name}</p>
+                  <p className="text-xs text-neutral-400 capitalize">{user.role}</p>
+                </div>
+                <button
+                  onClick={handleLogout}
+                  className="rounded-lg border border-neutral-200 px-3 py-1.5 text-xs font-medium text-neutral-600 hover:bg-neutral-50 hover:text-neutral-800 transition-colors"
+                >
+                  Sign Out
+                </button>
+              </div>
+            </>
+          ) : (
+            <>
+              <Link href="/auth/login" className="hover:text-primary-600 transition-colors">
+                Sign In
+              </Link>
+              <Link
+                href="/auth/signup"
+                className="rounded-lg bg-primary-600 px-3 py-1.5 text-white hover:bg-primary-700 transition-colors"
+              >
+                Sign Up
+              </Link>
+            </>
+          )}
         </nav>
       </div>
     </header>

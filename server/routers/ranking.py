@@ -2,9 +2,11 @@
 
 import logging
 
-from fastapi import APIRouter, BackgroundTasks, HTTPException, status
+from fastapi import APIRouter, BackgroundTasks, Depends, HTTPException, status
 
+from server.dependencies import require_recruiter
 from server.models.schemas import RankingTriggerRequest, RankingTriggerResponse
+from server.models.user import UserResponse
 from server.services import ranking_engine
 
 logger = logging.getLogger(__name__)
@@ -27,7 +29,11 @@ def _run_ranking_job(job_id: str, candidate_ids: list[str] | None) -> None:
 
 
 @router.post("/trigger", response_model=RankingTriggerResponse, status_code=status.HTTP_202_ACCEPTED)
-async def trigger_ranking(payload: RankingTriggerRequest, background_tasks: BackgroundTasks) -> RankingTriggerResponse:
+async def trigger_ranking(
+    payload: RankingTriggerRequest,
+    background_tasks: BackgroundTasks,
+    current_user: UserResponse = Depends(require_recruiter),
+) -> RankingTriggerResponse:
     """Start ranking asynchronously so NLP completion path returns quickly."""
     if not payload.jobId.strip():
         raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="jobId is required")

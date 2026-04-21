@@ -1,8 +1,12 @@
+from pathlib import Path
+
 from pydantic_settings import BaseSettings, SettingsConfigDict
+
+_ENV_FILE = Path(__file__).parent / ".env"
 
 
 class Settings(BaseSettings):
-    model_config = SettingsConfigDict(env_file=".env", env_file_encoding="utf-8")
+    model_config = SettingsConfigDict(env_file=str(_ENV_FILE), env_file_encoding="utf-8")
 
     gcp_project_id: str = "your-project-id"
     gcp_region: str = "us-central1"
@@ -23,6 +27,10 @@ class Settings(BaseSettings):
     ranking_threshold_shortlist: float = 75.0
     ranking_threshold_manual_review: float = 55.0
     ranking_version: str = "v1"
+
+    jwt_secret: str = "change-me-in-production-use-a-long-random-secret"
+    jwt_algorithm: str = "HS256"
+    jwt_expire_minutes: int = 60 * 24 * 7  # 7 days
 
     email_enabled: bool = False
     smtp_host: str = ""

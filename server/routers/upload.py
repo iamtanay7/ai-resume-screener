@@ -9,9 +9,11 @@ import logging
 import uuid
 from pathlib import Path
 
-from fastapi import APIRouter, Form, HTTPException, Query, Response, UploadFile, status
+from fastapi import APIRouter, Depends, Form, HTTPException, Query, Request, Response, UploadFile, status
+from jose import JWTError
 
 from server.config import settings
+from server.dependencies import get_current_user, require_candidate, require_recruiter
 from server.models.schemas import (
     DocumentProxyQuery,
     JobListItem,
@@ -19,7 +21,8 @@ from server.models.schemas import (
     UploadJDResponse,
     UploadResumeResponse,
 )
-from server.services import firestore_db, pubsub, storage
+from server.models.user import UserResponse
+from server.services import auth_service, firestore_db, pubsub, storage
 
 logger = logging.getLogger(__name__)
 router = APIRouter(prefix="/upload", tags=["upload"])
@@ -80,6 +83,7 @@ async def upload_resume(
     jobId: str = Form(...),
     email: str = Form(...),
     name: str = Form(...),
+    current_user: UserResponse = Depends(require_candidate),
 ) -> UploadResumeResponse:
     """
     Accept a candidate resume (PDF/DOCX), store it in GCS,
@@ -151,6 +155,7 @@ async def upload_resume(
 async def upload_jd(
     file: UploadFile,
     jobTitle: str = Form(...),
+    current_user: UserResponse = Depends(require_recruiter),
 ) -> UploadJDResponse:
     """
     Accept a recruiter's job description (PDF/DOCX), store it in GCS,
@@ -202,7 +207,10 @@ async def upload_jd(
 
 
 @router.get("/resume/{candidate_id}/status", response_model=ProcessingStatusResponse)
-async def get_resume_status(candidate_id: str) -> ProcessingStatusResponse:
+async def get_resume_status(
+    candidate_id: str,
+    current_user: UserResponse = Depends(get_current_user),
+) -> ProcessingStatusResponse:
     candidate = firestore_db.get_candidate(candidate_id)
     if candidate is None:
         raise HTTPException(
@@ -218,7 +226,10 @@ async def get_resume_status(candidate_id: str) -> ProcessingStatusResponse:
 
 
 @router.get("/jd/{job_id}/status", response_model=ProcessingStatusResponse)
-async def get_jd_status(job_id: str) -> ProcessingStatusResponse:
+async def get_jd_status(
+    job_id: str,
+    current_user: UserResponse = Depends(require_recruiter),
+) -> ProcessingStatusResponse:
     job = firestore_db.get_job(job_id)
     if job is None:
         raise HTTPException(
@@ -234,16 +245,44 @@ async def get_jd_status(job_id: str) -> ProcessingStatusResponse:
 
 
 @router.get("/jds", response_model=list[JobListItem])
-async def list_uploaded_jds() -> list[JobListItem]:
+async def list_uploaded_jds(current_user: UserResponse = Depends(get_current_user)) -> list[JobListItem]:
     return [JobListItem(**job) for job in firestore_db.list_jobs()]
 
 
+def _verify_proxy_auth(request: Request, token_param: str | None) -> None:
+    """Allow auth via Bearer header or ?token= query param (iframes can't set headers)."""
+    token = token_param
+
+    if not token:
+        auth_header = request.headers.get("Authorization", "")
+        if auth_header.startswith("Bearer "):
+            token = auth_header[7:]
+
+    if not token:
+        raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Authentication required.")
+
+    try:
+        payload = auth_service.decode_access_token(token)
+    except JWTError:
+        raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Invalid or expired token.")
+
+    if payload.get("role") != "recruiter":
+        raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Recruiters only.")
+
+
 @router.get("/file")
-async def proxy_uploaded_file(gcsUri: str = Query(..., min_length=6)) -> Response:
+async def proxy_uploaded_file(
+    request: Request,
+    gcsUri: str = Query(..., min_length=6),
+    token: str | None = Query(default=None),
+) -> Response:
     """
     Proxy a private GCS object through the backend so browser previews work
-    without making the bucket public.
+    without making the bucket public. Accepts auth via Bearer header or ?token= query param
+    (the latter is needed for iframe embeds which cannot set custom headers).
     """
+    _verify_proxy_auth(request, token)
+
     try:
         query = DocumentProxyQuery(gcsUri=gcsUri)
         downloaded = storage.download_file_with_metadata(query.gcsUri)

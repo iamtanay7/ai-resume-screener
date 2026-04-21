@@ -13,6 +13,7 @@ _client: firestore.Client | None = None
 COLLECTION_CANDIDATES = "candidates"
 COLLECTION_JOBS = "jobs"
 COLLECTION_JOB_RESULTS = "jobResults"
+COLLECTION_USERS = "users"
 SUBCOLLECTION_NLP = "nlpArtifacts"
 
 
@@ -205,6 +206,38 @@ def _get_client() -> firestore.Client:
     if _client is None:
         _client = firestore.Client(project=settings.gcp_project_id)
     return _client
+
+
+def write_user(user_id: str, name: str, email: str, hashed_password: str, role: str) -> None:
+    """Write a new user document to Firestore."""
+    db = _get_client()
+    doc_ref = db.collection(COLLECTION_USERS).document(user_id)
+    doc_ref.set(
+        {
+            "id": user_id,
+            "name": name,
+            "email": email,
+            "hashedPassword": hashed_password,
+            "role": role,
+            "createdAt": datetime.now(timezone.utc).isoformat(),
+        }
+    )
+
+
+def get_user_by_id(user_id: str) -> dict[str, Any] | None:
+    """Fetch a user document by ID."""
+    db = _get_client()
+    doc = db.collection(COLLECTION_USERS).document(user_id).get()
+    return doc.to_dict() if doc.exists else None
+
+
+def get_user_by_email(email: str) -> dict[str, Any] | None:
+    """Fetch a user document by email address."""
+    db = _get_client()
+    docs = list(db.collection(COLLECTION_USERS).where("email", "==", email).limit(1).stream())
+    if not docs:
+        return None
+    return docs[0].to_dict()
 
 
 def write_candidate(candidate_id: str, name: str, email: str, gcs_url: str, job_id: str) -> None:

@@ -1,4 +1,9 @@
+"use client";
+
+import { useEffect } from "react";
 import Link from "next/link";
+import { useRouter } from "next/navigation";
+import { useAuth } from "@/contexts/AuthContext";
 import { Card } from "@/components/ui/Card";
 
 const PIPELINE_STEPS = [
@@ -11,6 +16,15 @@ const PIPELINE_STEPS = [
 ];
 
 export default function LandingPage() {
+  const { user, loading } = useAuth();
+  const router = useRouter();
+
+  useEffect(() => {
+    if (!loading && user) {
+      router.replace(user.role === "recruiter" ? "/recruiter" : "/candidate");
+    }
+  }, [user, loading, router]);
+
   return (
     <div className="page-container space-y-16">
       {/* Hero */}
@@ -32,7 +46,7 @@ export default function LandingPage() {
 
       {/* CTA cards */}
       <section className="grid gap-6 sm:grid-cols-2 max-w-2xl mx-auto">
-        <Link href="/recruiter" className="group block">
+        <Link href="/auth/signup" className="group block">
           <Card hover className="h-full flex flex-col items-center text-center gap-4 py-8">
             <div className="flex h-14 w-14 items-center justify-center rounded-2xl bg-primary-100 text-2xl group-hover:bg-primary-200 transition-colors">
               🧑‍💼
@@ -52,7 +66,7 @@ export default function LandingPage() {
           </Card>
         </Link>
 
-        <Link href="/candidate" className="group block">
+        <Link href="/auth/signup" className="group block">
           <Card hover className="h-full flex flex-col items-center text-center gap-4 py-8">
             <div className="flex h-14 w-14 items-center justify-center rounded-2xl bg-success-100 text-2xl group-hover:bg-success-200 transition-colors">
               🙋

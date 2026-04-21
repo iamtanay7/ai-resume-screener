@@ -6,9 +6,11 @@ POST /notify/{candidate_id}
 
 import logging
 
-from fastapi import APIRouter, HTTPException, status
+from fastapi import APIRouter, Depends, HTTPException, status
 
+from server.dependencies import require_recruiter
 from server.models.schemas import NotifyResponse
+from server.models.user import UserResponse
 from server.notifications.service import approve_and_send_candidate_email
 from server.services import firestore_db
 
@@ -17,7 +19,10 @@ router = APIRouter(prefix="/notify", tags=["notify"])
 
 
 @router.post("/{candidate_id}", response_model=NotifyResponse)
-async def approve_email(candidate_id: str) -> NotifyResponse:
+async def approve_email(
+    candidate_id: str,
+    current_user: UserResponse = Depends(require_recruiter),
+) -> NotifyResponse:
     """
     Mark the candidate's notification email as recruiter-approved and send it immediately.
     """

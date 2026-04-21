@@ -1,6 +1,7 @@
 import type { Metadata } from "next";
 import "./globals.css";
 import { Navbar } from "@/components/Navbar";
+import { Providers } from "@/components/Providers";
 
 export const metadata: Metadata = {
   title: "ResumeAI — AI-powered Resume Screener",
@@ -16,8 +17,10 @@ export default function RootLayout({
   return (
     <html lang="en">
       <body>
-        <Navbar />
-        <main className="min-h-screen">{children}</main>
+        <Providers>
+          <Navbar />
+          <main className="min-h-screen">{children}</main>
+        </Providers>
       </body>
     </html>
   );

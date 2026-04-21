@@ -6,7 +6,7 @@ from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 
 from server.config import settings
-from server.routers import explainability, ingest, notify, ranking, results, upload
+from server.routers import auth, explainability, ingest, notify, ranking, results, upload
 
 logging.basicConfig(
     level=logging.INFO,
@@ -21,18 +21,22 @@ app = FastAPI(
     version="1.1.0",
 )
 
+_allowed_origins = [
+    origin.strip()
+    for origin in settings.cors_origin.split(",")
+    if origin.strip()
+]
+
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=[
-        origin.strip()
-        for origin in settings.cors_origin.split(",")
-        if origin.strip()
-    ],
+    allow_origins=_allowed_origins,
+    allow_origin_regex=r"http://localhost(:\d+)?",
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
 )
 
+app.include_router(auth.router)
 app.include_router(upload.router)
 app.include_router(ranking.router)
 app.include_router(ingest.router)

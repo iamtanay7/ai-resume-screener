@@ -6,9 +6,11 @@ GET /results/{job_id}
 
 import logging
 
-from fastapi import APIRouter, HTTPException, status
+from fastapi import APIRouter, Depends, HTTPException, status
 
+from server.dependencies import require_recruiter
 from server.models.schemas import RankedCandidate
+from server.models.user import UserResponse
 from server.services import firestore_db, ranking_engine
 
 logger = logging.getLogger(__name__)
@@ -16,7 +18,10 @@ router = APIRouter(prefix="/results", tags=["results"])
 
 
 @router.get("/{job_id}", response_model=list[RankedCandidate])
-async def get_results(job_id: str) -> list[RankedCandidate]:
+async def get_results(
+    job_id: str,
+    current_user: UserResponse = Depends(require_recruiter),
+) -> list[RankedCandidate]:
     """
     Return all candidates ranked against the given job, ordered by rank ascending.
     Ranking data is written by Michael's matching engine into Firestore.

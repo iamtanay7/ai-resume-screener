@@ -2,6 +2,8 @@
 
 import { Suspense, useEffect, useRef, useState } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
+import { ProtectedRoute } from "@/components/ProtectedRoute";
+import { useAuth } from "@/contexts/AuthContext";
 import { FileUpload } from "@/components/ui/FileUpload";
 import { Button } from "@/components/ui/Button";
 import { Card } from "@/components/ui/Card";
@@ -23,11 +25,12 @@ const INITIAL_STAGES: PipelineStage[] = [
 ];
 
 function CandidatePageContent() {
+  const { user } = useAuth();
   const router = useRouter();
   const searchParams = useSearchParams();
   const [file, setFile]       = useState<File | null>(null);
-  const [email, setEmail]     = useState("");
-  const [name, setName]       = useState("");
+  const [email, setEmail]     = useState(user?.email ?? "");
+  const [name, setName]       = useState(user?.name ?? "");
   const [loading, setLoading] = useState(false);
   const [error, setError]     = useState<string | null>(null);
   const [done, setDone]       = useState(false);
@@ -309,9 +312,11 @@ function CandidatePageContent() {
 
 export default function CandidatePage() {
   return (
-    <Suspense fallback={<div className="page-container max-w-2xl" />}>
-      <CandidatePageContent />
-    </Suspense>
+    <ProtectedRoute role="candidate">
+      <Suspense fallback={<div className="page-container max-w-2xl" />}>
+        <CandidatePageContent />
+      </Suspense>
+    </ProtectedRoute>
   );
 }
 

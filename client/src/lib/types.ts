@@ -1,3 +1,18 @@
+export type UserRole = "recruiter" | "candidate";
+
+export interface User {
+  id: string;
+  name: string;
+  email: string;
+  role: UserRole;
+}
+
+export interface AuthTokenResponse {
+  access_token: string;
+  token_type: string;
+  user: User;
+}
+
 export type CandidateStatus = "shortlist" | "manual_review" | "reject";
 
 export type PipelineStageStatus = "pending" | "processing" | "done" | "error";

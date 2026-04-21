@@ -2,6 +2,7 @@
 
 import { Suspense, useEffect, useRef, useState } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
+import { ProtectedRoute } from "@/components/ProtectedRoute";
 import { FileUpload } from "@/components/ui/FileUpload";
 import { Button } from "@/components/ui/Button";
 import { Card } from "@/components/ui/Card";
@@ -344,9 +345,11 @@ function RecruiterPageContent() {
 
 export default function RecruiterPage() {
   return (
-    <Suspense fallback={<div className="page-container max-w-2xl" />}>
-      <RecruiterPageContent />
-    </Suspense>
+    <ProtectedRoute role="recruiter">
+      <Suspense fallback={<div className="page-container max-w-2xl" />}>
+        <RecruiterPageContent />
+      </Suspense>
+    </ProtectedRoute>
   );
 }
 
